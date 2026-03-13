@@ -55,7 +55,7 @@ npm run package
 ## 2.1 GitHub Actions Release Flow
 
 - `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests and should be treated as the baseline build-health check.
-- `.github/workflows/release.yml` is for distributable Windows releases and should only publish when a Git tag matching `v*` is pushed, for example `v0.2.5`, or when manually triggered with `workflow_dispatch`.
+- `.github/workflows/release.yml` is for distributable Windows releases and should only publish when a Git tag matching `v*` is pushed, for example `v0.2.5`, or when manually triggered with `workflow_dispatch` and an explicit release tag input.
 - When explaining release flow to contributors, spell out that ordinary pushes do **not** create GitHub Releases automatically.
 - Preferred release trigger example:
 

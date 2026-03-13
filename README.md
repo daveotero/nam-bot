@@ -66,7 +66,7 @@ Direct links:
 This repo also includes GitHub Actions for public distribution:
 
 - `CI` runs on pushes to `main` and on pull requests to make sure `npm run build` still passes
-- `Release` packages the Windows installer and uploads release assets only when a Git tag like `v0.3.0` is pushed, or when the workflow is run manually from GitHub Actions
+- `Release` packages the Windows installer and uploads release assets when a Git tag like `v0.3.0` is pushed, or when the workflow is run manually from GitHub Actions with a release tag input
 
 ## Setup Overview
 

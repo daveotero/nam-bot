@@ -54,7 +54,7 @@ git tag v0.3.0
 git push origin v0.3.0
 ```
 
-You can also run the release workflow manually from the GitHub Actions tab by using `workflow_dispatch`.
+You can also run the release workflow manually from the GitHub Actions tab by using `workflow_dispatch` and entering a release tag such as `v0.3.0`.
 
 ## Project Context
 
