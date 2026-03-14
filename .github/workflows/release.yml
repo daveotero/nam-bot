@@ -70,6 +70,7 @@ jobs:
 
       - name: Remove obsolete blockmap asset from GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: powershell
