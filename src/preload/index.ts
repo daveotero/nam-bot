@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 import type { AppCommand } from '../shared/appShell'
+import type { UpdateStatus } from '../shared/update'
 
 export interface NamBotApi {
   settings: {
@@ -48,10 +49,16 @@ export interface NamBotApi {
     getTerminal: (jobId: string) => Promise<string>
     getDiagnostics: () => Promise<string>
   }
+  updates: {
+    getStatus: () => Promise<UpdateStatus>
+    openLatestRelease: () => Promise<void>
+    openLatestChangelog: () => Promise<void>
+  }
   events: {
     onQueueUpdated: (callback: (queue: unknown[]) => void) => () => void
     onJobUpdated: (callback: (state: unknown) => void) => () => void
     onBackendValidationUpdated: (callback: (summary: unknown) => void) => () => void
+    onUpdateStatusChanged: (callback: (status: UpdateStatus) => void) => () => void
     onAppCommand: (callback: (command: AppCommand) => void) => () => void
   }
 }
@@ -102,6 +109,11 @@ const api: NamBotApi = {
     getTerminal: (jobId) => ipcRenderer.invoke('logs:getTerminal', jobId),
     getDiagnostics: () => ipcRenderer.invoke('logs:getDiagnostics')
   },
+  updates: {
+    getStatus: () => ipcRenderer.invoke('updates:getStatus'),
+    openLatestRelease: () => ipcRenderer.invoke('updates:openLatestRelease'),
+    openLatestChangelog: () => ipcRenderer.invoke('updates:openLatestChangelog')
+  },
   events: {
     onQueueUpdated: (callback) => {
       const handler = (_event: Electron.IpcRendererEvent, queue: unknown[]) => callback(queue)
@@ -117,6 +129,11 @@ const api: NamBotApi = {
       const handler = (_event: Electron.IpcRendererEvent, summary: unknown) => callback(summary)
       ipcRenderer.on('backend:validationUpdated', handler)
       return () => ipcRenderer.removeListener('backend:validationUpdated', handler)
+    },
+    onUpdateStatusChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status)
+      ipcRenderer.on('updates:statusChanged', handler)
+      return () => ipcRenderer.removeListener('updates:statusChanged', handler)
     },
     onAppCommand: (callback) => {
       const handler = (_event: Electron.IpcRendererEvent, command: AppCommand) => callback(command)

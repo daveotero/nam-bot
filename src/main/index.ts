@@ -6,6 +6,7 @@ import { setupIpcHandlers, validateBackendOnStartup } from './ipc/settings'
 import { setupJobIpcHandlers } from './ipc/jobs'
 import { setupPresetIpcHandlers } from './ipc/presets'
 import { setupLogsIpcHandlers } from './ipc/logs'
+import { checkForUpdatesOnStartup, setupUpdateIpcHandlers } from './ipc/updates'
 import { getQueueManager } from './jobs/queueManager'
 import type { JobRuntimeState, JobStatus } from './types/jobs'
 import { installApplicationMenu } from './shell/appMenu'
@@ -294,6 +295,7 @@ function createWindow(): void {
 
   mainWindow.webContents.once('did-finish-load', () => {
     void validateBackendOnStartup()
+    void checkForUpdatesOnStartup()
   })
 
   mainWindow.on('closed', () => {
@@ -323,6 +325,7 @@ app.whenReady().then(() => {
   setupJobIpcHandlers()
   setupPresetIpcHandlers()
   setupLogsIpcHandlers()
+  setupUpdateIpcHandlers()
   setupRendererErrorLogging()
   setupShellIntegrations()
   installApplicationMenu({

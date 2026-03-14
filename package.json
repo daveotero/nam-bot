@@ -1,6 +1,6 @@
 {
   "name": "nam-bot",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Neural Amp Modeler Training Manager (Alpha)",
   "main": "./out/main/index.js",
   "scripts": {

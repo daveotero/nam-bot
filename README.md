@@ -12,6 +12,8 @@ NAM-BOT is an Electron desktop app that wraps the local Neural Amp Modeler train
 
 If you do not already have NAM installed locally, NAM-BOT is also meant to help you get there. The app includes setup guidance and diagnostics that walk you through the steps to get a working local NAM environment up and running.
 
+One of the most fun parts of NAM-BOT is that presets are not trapped on one machine. You can export and import training presets to share setups with other people, including creator name and creator URL metadata so the preset can carry attribution and a link back to its source.
+
 ![NAM-BOT dashboard](./docs/screenshots/dashboard.png)
 
 ## Why I Built This
@@ -29,7 +31,7 @@ The goal is not to replace the deeper hands-on side of NAM. It is to give you a 
 NAM-BOT tries to make local training smoother by giving you:
 
 - A desktop UI for creating, queueing, and monitoring NAM training jobs
-- Reusable presets so repeat runs are faster and less error-prone
+- Reusable presets you can export, import, and share with creator metadata
 - Guided setup help for people who are newer to the NAM and Python side
 - Diagnostics that explain backend and accelerator problems in plain language
 - Live training logs without needing to camp in a terminal window
@@ -38,6 +40,7 @@ NAM-BOT tries to make local training smoother by giving you:
 
 - Queue multiple training jobs and track status from a dashboard
 - Save and reuse training presets across runs
+- Export and import presets for sharing, including creator name and URL metadata
 - Point the app at either a Conda environment or a direct Python executable
 - Validate backend setup before launching jobs
 - Inspect CUDA, MPS, Lightning, and host GPU visibility from Diagnostics
@@ -54,19 +57,14 @@ NAM-BOT tries to make local training smoother by giving you:
 
 For a public repository, the typical user-friendly path is:
 
-1. Open the [GitHub Releases page](https://github.com/daveotero/nam-bot/releases).
-2. Download either the latest Windows installer or the portable zip.
-3. Run the installer, or unzip the portable build and launch `NAM-BOT.exe`.
-
-Direct links:
-
-- [Latest release](https://github.com/daveotero/nam-bot/releases/latest)
-- [All releases](https://github.com/daveotero/nam-bot/releases)
+1. Open the GitHub Releases page.
+2. Download the latest Windows installer.
+3. Run the installer and launch NAM-BOT.
 
 This repo also includes GitHub Actions for public distribution:
 
-- `CI` runs on pushes to `main` and on pull requests to make sure `npm run build` still passes
-- `Release` packages the Windows installer and uploads release assets when a Git tag like `v0.3.0` is pushed, or when the workflow is run manually from GitHub Actions with a release tag input
+- `CI` runs on every push and pull request to make sure `npm run build` still passes
+- `Release` packages the Windows installer and uploads release assets only when a Git tag like `v0.3.1` is pushed, or when the workflow is run manually from GitHub Actions
 
 ## Setup Overview
 
@@ -144,6 +142,12 @@ If the built-in guidance is not enough, the Diagnostics panel can also generate 
 3. Save the job draft.
 4. Queue it.
 5. Monitor progress from the Dashboard and Jobs screens.
+
+## Preset Sharing
+
+Presets are more than saved defaults. NAM-BOT lets you export a training preset, send it to someone else, and import theirs into your own library.
+
+That makes it much easier to trade training recipes with other NAM users while keeping useful context attached. Creator name and creator URL metadata can travel with the preset, so people can see who made it and where to find more info.
 
 ## In Action
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-14
+
+### Added
+
+- Background GitHub release checking with a pulsing About-nav indicator and About-screen update links for latest release notes
+- About screen documentation covering the new automatic update-check behavior
+
+### Changed
+
+- About screen version display now uses live app version info and keeps update messaging consolidated in the Project Info section
+- README now emphasizes preset export/import sharing and creator metadata as a core NAM-BOT capability
+
 ## [0.3.0] - 2026-03-13
 
 ### Added

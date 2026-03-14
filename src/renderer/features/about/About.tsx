@@ -1,5 +1,6 @@
 import type { CSSProperties, JSX } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { UpdateStatus } from '../../../shared/update'
 import { useAppStore } from '../../state/store'
 import { normalizeTrainingPreset } from '../../state/types'
 import AboutMiniGame from './AboutMiniGame'
@@ -67,6 +68,10 @@ interface BootSequenceEntry {
   label: string
   value: string
   link?: string
+  secondaryLinkLabel?: string
+  secondaryLink?: string
+  statusText?: string
+  statusClassName?: string
 }
 
 interface BootSequenceRichTextSegment {
@@ -91,39 +96,59 @@ const asciiLogo = `
 ╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝     ╚═╝      ╚═════╝  ╚═════╝    ╚═╝
 `
 
-const bootSequence: BootSequenceItem[] = [
-  { type: 'logo', content: asciiLogo },
-  { type: 'row', color: 'neon-green', content: 'WELCOME TO NAM-BOT BBS (v0.3.0)' },
-  { type: 'row', color: 'neon-green', content: 'NODE 1 - ONLINE 2400-56KBPS' },
-  { type: 'break' },
-  { type: 'header', color: 'neon-cyan', content: '[ PROJECT INFO ]' },
-  { type: 'entry', label: 'REPO:', value: 'github.com/daveotero/nam-bot', link: 'https://github.com/daveotero/nam-bot' },
-  { type: 'entry', label: 'REPORTS:', value: 'github.com/daveotero/nam-bot/issues', link: 'https://github.com/daveotero/nam-bot/issues' },
-  { type: 'entry', label: 'VERSION:', value: '0.3.0' },
-  { type: 'break' },
-  { type: 'header', color: 'neon-magenta', content: '[ CREATOR ]' },
-  { type: 'entry', label: 'SYSOP:', value: 'daveotero.com', link: 'https://daveotero.com' },
-  { type: 'entry', label: 'STUDIO:', value: 'flatlineaudio.com', link: 'https://flatlineaudio.com' },
-  { type: 'entry', label: 'SUPPORT:', value: 'ko-fi.com/daveotero', link: 'https://ko-fi.com/daveotero' },
-  { type: 'break' },
-  { type: 'header', color: 'neon-gold', content: '[ LEGAL & NOTICES ]' },
-  {
-    type: 'rich-text',
-    segments: [
-      { text: 'Neural Amp Modeler', link: 'https://github.com/sdatkinson/neural-amp-modeler' },
-      { text: ' core created by ' },
-      { text: 'Steven Atkinson', link: 'https://github.com/sdatkinson' },
-      { text: '.' }
-    ]
-  },
-  { type: 'text', content: 'NAM-BOT is licensed under MIT. © 2026 Dave Otero.' },
-  {
-    type: 'text',
-    content: 'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY.',
-    style: { fontSize: '11px', marginTop: '12px', opacity: 0.7 }
-  },
-  { type: 'break' }
-]
+function createBootSequence(updateStatus: UpdateStatus): BootSequenceItem[] {
+  const hasUpdateAvailable = updateStatus.state === 'update-available'
+
+  return [
+    { type: 'logo', content: asciiLogo },
+    { type: 'row', color: 'neon-green', content: 'WELCOME TO NAM-BOT BBS' },
+    { type: 'row', color: 'neon-green', content: 'NODE 1 - ONLINE 2400-56KBPS' },
+    { type: 'break' },
+    { type: 'header', color: 'neon-cyan', content: '[ PROJECT INFO ]' },
+    { type: 'entry', label: 'REPO:', value: 'github.com/daveotero/nam-bot', link: 'https://github.com/daveotero/nam-bot' },
+    { type: 'entry', label: 'REPORTS:', value: 'github.com/daveotero/nam-bot/issues', link: 'https://github.com/daveotero/nam-bot/issues' },
+    {
+      type: 'entry',
+      label: 'VERSION:',
+      value: updateStatus.currentVersion,
+      statusText: hasUpdateAvailable ? 'UPDATE AVAILABLE' : undefined,
+      statusClassName: hasUpdateAvailable ? 'terminal-entry-status-update' : undefined
+    },
+    ...(hasUpdateAvailable && updateStatus.latestVersion ? [
+      {
+        type: 'entry',
+        label: 'LATEST:',
+        value: updateStatus.latestVersion,
+        link: updateStatus.releaseUrl ?? undefined,
+        secondaryLinkLabel: 'CHANGELOG',
+        secondaryLink: updateStatus.changelogUrl ?? undefined
+      } as BootSequenceEntry
+    ] : []),
+    { type: 'break' },
+    { type: 'header', color: 'neon-magenta', content: '[ CREATOR ]' },
+    { type: 'entry', label: 'SYSOP:', value: 'daveotero.com', link: 'https://daveotero.com' },
+    { type: 'entry', label: 'STUDIO:', value: 'flatlineaudio.com', link: 'https://flatlineaudio.com' },
+    { type: 'entry', label: 'SUPPORT:', value: 'ko-fi.com/daveotero', link: 'https://ko-fi.com/daveotero' },
+    { type: 'break' },
+    { type: 'header', color: 'neon-gold', content: '[ LEGAL & NOTICES ]' },
+    {
+      type: 'rich-text',
+      segments: [
+        { text: 'Neural Amp Modeler', link: 'https://github.com/sdatkinson/neural-amp-modeler' },
+        { text: ' core created by ' },
+        { text: 'Steven Atkinson', link: 'https://github.com/sdatkinson' },
+        { text: '.' }
+      ]
+    },
+    { type: 'text', content: 'NAM-BOT is licensed under MIT. © 2026 Dave Otero.' },
+    {
+      type: 'text',
+      content: 'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY.',
+      style: { fontSize: '11px', marginTop: '12px', opacity: 0.7 }
+    },
+    { type: 'break' }
+  ]
+}
 
 const epochRunnerLoaderLines = [
   'Launching EPOCHRUNNER.EXE',
@@ -152,7 +177,12 @@ function getItemLength(item: BootSequenceItem): number {
   }
 
   if (item.type === 'entry') {
-    return item.label.length + item.value.length
+    return (
+      item.label.length
+      + item.value.length
+      + (item.secondaryLinkLabel?.length ?? 0)
+      + (item.statusText?.length ?? 0)
+    )
   }
 
   if (item.type === 'rich-text') {
@@ -189,7 +219,11 @@ function renderBootItem(
       return <h2 key={index} className={`terminal-header ${item.color ?? ''}`}>{item.content.slice(0, visibleInItem)}</h2>
     case 'entry': {
       const labelVisible = Math.min(item.label.length, visibleInItem)
-      const valueVisible = Math.max(0, visibleInItem - item.label.length)
+      const remainingAfterLabel = Math.max(0, visibleInItem - item.label.length)
+      const valueVisible = Math.min(item.value.length, remainingAfterLabel)
+      const remainingAfterValue = Math.max(0, remainingAfterLabel - item.value.length)
+      const secondaryLinkVisible = Math.min(item.secondaryLinkLabel?.length ?? 0, remainingAfterValue)
+      const statusVisible = Math.max(0, remainingAfterValue - (item.secondaryLinkLabel?.length ?? 0))
 
       return (
         <div key={index} className="terminal-entry">
@@ -200,6 +234,16 @@ function renderBootItem(
             </a>
           ) : (
             <span className="terminal-field-value">{item.value.slice(0, valueVisible)}</span>
+          )}
+          {item.secondaryLink && item.secondaryLinkLabel && secondaryLinkVisible > 0 && (
+            <a href={item.secondaryLink} target="_blank" rel="noreferrer" className="terminal-link terminal-secondary-link">
+              {item.secondaryLinkLabel.slice(0, secondaryLinkVisible)}
+            </a>
+          )}
+          {item.statusText && statusVisible > 0 && (
+            <span className={`terminal-entry-status ${item.statusClassName ?? ''}`}>
+              {item.statusText.slice(0, statusVisible)}
+            </span>
           )}
         </div>
       )
@@ -242,6 +286,7 @@ function renderBootItem(
 
 export default function About() {
   const presets = useAppStore((state) => state.presets)
+  const updateStatus = useAppStore((state) => state.updateStatus)
   const loadPresets = useAppStore((state) => state.loadPresets)
   const [history, setHistory] = useState<TerminalHistoryEntry[]>([])
   const [currentInput, setCurrentInput] = useState<string>('')
@@ -255,10 +300,12 @@ export default function About() {
   const terminalEndRef = useRef<HTMLDivElement | null>(null)
   const gameContainerRef = useRef<HTMLDivElement | null>(null)
   const nextHistoryEntryIdRef = useRef<number>(1)
+  const bootSequence = useMemo<BootSequenceItem[]>(() => createBootSequence(updateStatus), [updateStatus])
+  const hasUpdateAvailable = updateStatus.state === 'update-available'
 
   const totalLength = useMemo<number>(
     () => bootSequence.reduce((accumulator, item) => accumulator + getItemLength(item), 0),
-    []
+    [bootSequence]
   )
   const rewardPreset = presets.find((preset) => isEpochRunnerRewardPreset(preset))
   const isRewardUnlocked = rewardPreset != null
@@ -634,6 +681,22 @@ export default function About() {
           font-size: 20px;
         }
 
+        .terminal-entry-status {
+          color: var(--neon-gold);
+          font-size: 18px;
+          text-shadow: 0 0 10px rgba(255, 204, 0, 0.75);
+        }
+
+        .terminal-entry-status-update {
+          animation: terminalCrtFlash 1.1s steps(2, end) infinite;
+        }
+
+        .terminal-secondary-link {
+          color: var(--neon-cyan);
+          text-transform: uppercase;
+          font-size: 18px;
+        }
+
         .terminal-link {
           color: var(--neon-green);
           text-decoration: underline;
@@ -701,6 +764,21 @@ export default function About() {
           animation: blink 1s step-end infinite;
         }
 
+        @keyframes terminalCrtFlash {
+          0%, 100% {
+            opacity: 1;
+            text-shadow: 0 0 6px currentColor, 0 0 18px currentColor;
+          }
+          45% {
+            opacity: 0.35;
+            text-shadow: 0 0 2px currentColor;
+          }
+          55% {
+            opacity: 0.9;
+            text-shadow: 0 0 12px currentColor, 0 0 24px currentColor;
+          }
+        }
+
         .neon-green { color: var(--neon-green); }
         .neon-cyan { color: var(--neon-cyan); }
         .neon-magenta { color: var(--neon-magenta); }
@@ -717,7 +795,9 @@ export default function About() {
           .terminal-field-value,
           .terminal-link,
           .terminal-text,
-          .terminal-prompt {
+          .terminal-prompt,
+          .terminal-entry-status,
+          .terminal-secondary-link {
             font-size: 16px;
           }
 

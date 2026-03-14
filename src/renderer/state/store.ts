@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { JobSpec, TrainingPresetFile, JobRuntimeState } from '../../shared/training'
+import { createDefaultUpdateStatus, type UpdateStatus } from '../../shared/update'
 
 const epochRunnerRewardPresetId = 'epoch-runner-reward'
 const epochRunnerRewardPresetName = 'Converged Night Run'
@@ -164,6 +165,7 @@ interface AppState {
   validation: BackendValidationSummary | null
   acceleratorDiagnostics: AcceleratorDiagnosticsSummary | null
   condaDiscovery: CondaDiscoverySummary | null
+  updateStatus: UpdateStatus
   presets: TrainingPresetFile[]
   presetEditorSession: PresetEditorSession | null
   jobEditorSession: JobEditorSession | null
@@ -177,6 +179,7 @@ interface AppState {
   setValidation: (validation: BackendValidationSummary) => void
   setAcceleratorDiagnostics: (diagnostics: AcceleratorDiagnosticsSummary) => void
   setCondaDiscovery: (condaDiscovery: CondaDiscoverySummary) => void
+  setUpdateStatus: (updateStatus: UpdateStatus) => void
   setPresets: (presets: TrainingPresetFile[]) => void
   setPresetEditorSession: (session: PresetEditorSession | null) => void
   clearPresetEditorSession: () => void
@@ -193,6 +196,7 @@ interface AppState {
   validateBackend: () => Promise<void>
   loadAcceleratorDiagnostics: () => Promise<void>
   detectConda: () => Promise<void>
+  loadUpdateStatus: () => Promise<void>
   loadPresets: () => Promise<void>
   loadJobs: () => Promise<void>
   subscribeToJobEvents: () => (() => void)
@@ -203,6 +207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   validation: null,
   acceleratorDiagnostics: null,
   condaDiscovery: null,
+  updateStatus: createDefaultUpdateStatus('0.0.0'),
   presets: [],
   presetEditorSession: null,
   jobEditorSession: null,
@@ -216,6 +221,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setValidation: (validation) => set({ validation }),
   setAcceleratorDiagnostics: (acceleratorDiagnostics) => set({ acceleratorDiagnostics }),
   setCondaDiscovery: (condaDiscovery) => set({ condaDiscovery }),
+  setUpdateStatus: (updateStatus) => set({ updateStatus }),
   setPresets: (presets) => set({ presets: sortPresets(presets) }),
   setPresetEditorSession: (presetEditorSession) => set({ presetEditorSession }),
   clearPresetEditorSession: () => set({ presetEditorSession: null }),
@@ -286,6 +292,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ condaDiscovery })
     } catch (error) {
       console.error('Failed to detect Conda on PATH:', error)
+    }
+  },
+
+  loadUpdateStatus: async () => {
+    try {
+      const updateStatus = await window.namBot.updates.getStatus()
+      set({ updateStatus })
+    } catch (error) {
+      console.error('Failed to load update status:', error)
     }
   },
   

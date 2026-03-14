@@ -3,6 +3,7 @@ import { HashRouter, NavLink, Route, Routes, useNavigate } from 'react-router-do
 
 import type { AppCommand } from '../shared/appShell'
 import { AcceleratorDiagnosticsSummary, BackendValidationSummary, useAppStore } from './state/store'
+import type { UpdateStatus } from '../shared/update'
 import { JobRuntimeState, TrainingPresetFile } from './state/types'
 import Settings from './features/settings/Settings'
 import Diagnostics from './features/diagnostics/Diagnostics'
@@ -341,29 +342,40 @@ function AppShell() {
   const settings = useAppStore((state) => state.settings)
   const presets = useAppStore((state) => state.presets)
   const queue = useAppStore((state) => state.queue)
+  const updateStatus = useAppStore((state) => state.updateStatus)
   const loadSettings = useAppStore((state) => state.loadSettings)
   const detectConda = useAppStore((state) => state.detectConda)
+  const loadUpdateStatus = useAppStore((state) => state.loadUpdateStatus)
   const setValidation = useAppStore((state) => state.setValidation)
+  const setUpdateStatus = useAppStore((state) => state.setUpdateStatus)
   const setIsTraining = useAppStore((state) => state.setIsTraining)
   const setJobEditorSession = useAppStore((state) => state.setJobEditorSession)
   const setPresetEditorSession = useAppStore((state) => state.setPresetEditorSession)
   const loadJobs = useAppStore((state) => state.loadJobs)
   const subscribeToJobEvents = useAppStore((state) => state.subscribeToJobEvents)
+  const hasUpdateAvailable = updateStatus.state === 'update-available'
 
   useEffect(() => {
     void loadSettings()
     void detectConda()
     void loadJobs()
+    void loadUpdateStatus()
     
     const unsub = subscribeToJobEvents()
     return unsub
-  }, [detectConda, loadSettings, loadJobs, subscribeToJobEvents])
+  }, [detectConda, loadSettings, loadJobs, loadUpdateStatus, subscribeToJobEvents])
 
   useEffect(() => {
     return window.namBot.events.onBackendValidationUpdated((summary: unknown) => {
       setValidation(summary as Parameters<typeof setValidation>[0])
     })
   }, [setValidation])
+
+  useEffect(() => {
+    return window.namBot.events.onUpdateStatusChanged((status: UpdateStatus) => {
+      setUpdateStatus(status)
+    })
+  }, [setUpdateStatus])
 
   useEffect(() => {
     const isActive = queue.some((runtime) =>
@@ -421,7 +433,8 @@ function AppShell() {
               Setup Guide
             </NavLink>
             <NavLink to="/about" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              About
+              <span>About</span>
+              {hasUpdateAvailable && <span className="nav-update-indicator" aria-label="Update available" />}
             </NavLink>
           </nav>
 

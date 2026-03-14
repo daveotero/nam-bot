@@ -42,7 +42,7 @@ Purpose: builds the app and creates the Windows installer output in `release/`.
 
 This repo includes two GitHub Actions workflows:
 
-- `CI`: runs on pushes to `main` and on pull requests, installs dependencies with `npm ci`, and runs `npm run build`
+- `CI`: runs on every push and pull request, installs dependencies with `npm ci`, and runs `npm run build`
 - `Release`: packages the Windows app and publishes release assets when a Git tag matching `v*` is pushed
 
 The release workflow does not run on every commit push.
@@ -50,11 +50,11 @@ The release workflow does not run on every commit push.
 To trigger a real release build, push a version tag such as:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
-You can also run the release workflow manually from the GitHub Actions tab by using `workflow_dispatch` and entering a release tag such as `v0.3.0`.
+You can also run the release workflow manually from the GitHub Actions tab by using `workflow_dispatch`.
 
 ## Project Context
 

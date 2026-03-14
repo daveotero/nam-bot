@@ -21,6 +21,7 @@ The menu is organized around the screens that already exist inside the app:
 - Finishing, failing, or canceling a job triggers a desktop notification. Clicking the notification brings the app forward and opens Jobs.
 - If a training job is still active, closing the window prompts before quitting because the trainer will be force-stopped.
 - `Help > About NAM-BOT` opens a conventional version dialog, while the in-app About route remains available as the Credits screen.
+- The in-app About route also performs a background GitHub Releases check on app load and highlights the About nav item when a newer stable version is available.
 
 ## Support Folders
 
