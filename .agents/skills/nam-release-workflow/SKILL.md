@@ -13,6 +13,9 @@ Use this skill to turn the current thread's completed repo changes into a clean 
 - Default to a patch bump for docs, UX polish, copy, bug fixes, small workflow improvements, and project-maintenance changes.
 - Use a minor bump only when the repo gained a clearly new user-facing capability or a larger workflow surface.
 - Keep prerelease formatting consistent with the repo's current scheme, e.g. `0.0.5-alpha`.
+- Treat pushing `main` and pushing a release tag as separate decisions.
+- Always mention the matching version tag when reporting or proposing a release push to `main`.
+- Never push a version tag unless the user explicitly asks for it or explicitly confirms it in that thread.
 
 ## Required Files
 
@@ -33,7 +36,8 @@ Use this skill to turn the current thread's completed repo changes into a clean 
 7. Remove generated junk that should not linger between sessions, such as `out/`, `release/`, loose temporary logs, and scratch temp folders created during the work.
 8. Re-check `git status` so only intentional repo files remain.
 9. Commit with a direct release-oriented message.
-10. Push `main`. If the push is rejected because remote moved, rebase onto `origin/main`, resolve conflicts, rebuild if the rebase touched code, then push again.
+10. Push `main`. When reporting the push, explicitly mention whether the matching version tag has not been pushed yet and that pushing the tag is what triggers the public GitHub release. If the push is rejected because remote moved, rebase onto `origin/main`, resolve conflicts, rebuild if the rebase touched code, then push again.
+11. Only if the user explicitly asks for the full release tag push, create and push the matching `v<version>` tag.
 
 ## Changelog Notes
 

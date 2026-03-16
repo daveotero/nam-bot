@@ -58,6 +58,8 @@ npm run package
 - `.github/workflows/release.yml` is for distributable Windows releases and should only publish when a Git tag matching `v*` is pushed, for example `v0.2.5`, or when manually triggered with `workflow_dispatch`.
 - When explaining release flow to contributors, spell out that ordinary pushes do **not** create GitHub Releases automatically.
 - Preferred timing: push the finished commit to `main`, do the final smoke test, and only then push the version tag that should publish publicly.
+- When an agent pushes `main` for release work, it should always mention whether a matching version tag should also be pushed for a full GitHub release.
+- Agents must never push a release tag automatically without an explicit user confirmation in that thread, even when the version bump and release commit are already prepared.
 - Preferred release trigger example:
 
 ```bash
