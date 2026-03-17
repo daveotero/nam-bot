@@ -17,7 +17,7 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
-  condaExecutablePath: 'conda.exe',
+  condaExecutablePath: process.platform === 'win32' ? 'conda.exe' : 'conda',
   backendMode: 'conda-name',
   environmentName: 'nam',
   environmentPrefixPath: null,

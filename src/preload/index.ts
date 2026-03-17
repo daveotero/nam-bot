@@ -4,6 +4,7 @@ import type { AppCommand } from '../shared/appShell'
 import type { UpdateStatus } from '../shared/update'
 
 export interface NamBotApi {
+  platform: string
   settings: {
     get: () => Promise<unknown>
     save: (settings: unknown) => Promise<void>
@@ -64,6 +65,7 @@ export interface NamBotApi {
 }
 
 const api: NamBotApi = {
+  platform: process.platform,
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     save: (settings) => ipcRenderer.invoke('settings:save', settings),

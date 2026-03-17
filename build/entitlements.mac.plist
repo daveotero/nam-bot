@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS Entitlements (Alex Nasla, March 2026)
+  
+  Required for Electron apps distributed outside the Mac App Store.
+  These entitlements are needed because:
+  
+  - allow-jit: Electron's V8 JavaScript engine requires JIT compilation.
+    Without this, the app will crash on macOS with hardened runtime enabled.
+  
+  - allow-unsigned-executable-memory: Required by V8 for code generation
+    from writable memory pages (also part of how JS engines work).
+  
+  - disable-library-validation: Required to load node-pty's native .node
+    addon and any other third-party native modules that aren't Apple-signed.
+  
+  These are standard entitlements for all Electron apps on macOS.
+  See: https://www.electronjs.org/docs/latest/tutorial/code-signing
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>

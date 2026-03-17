@@ -215,7 +215,7 @@ export default function Help() {
           </h4>
           <ol style={{ color: 'var(--text-steel)', paddingLeft: '20px', marginBottom: '16px' }}>
             <li>Go to <strong>Settings</strong> in the left menu</li>
-            <li>Set the Conda executable path if your setup does not use the default <code style={{ color: 'var(--neon-cyan)' }}>conda.exe</code></li>
+            <li>Set the Conda executable path if your setup does not use the default <code style={{ color: 'var(--neon-cyan)' }}>conda</code> executable</li>
             <li>Set the backend mode to match how you launch NAM today</li>
             <li>Enter the Conda environment name or environment path that already contains your working NAM install</li>
           </ol>
@@ -281,7 +281,7 @@ export default function Help() {
             Navigate to: <a href="https://www.anaconda.com/download" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-cyan)' }}>https://www.anaconda.com/download</a>
           </p>
           <p style={{ color: 'var(--text-steel)' }}>
-            Install Miniconda and make sure <code style={{ color: 'var(--neon-cyan)' }}>conda.exe</code> is added to your PATH.
+            Install Miniconda and make sure <code style={{ color: 'var(--neon-cyan)' }}>conda</code> is added to your PATH.
           </p>
           <div style={{
             backgroundColor: 'rgba(0, 243, 255, 0.05)',
@@ -326,7 +326,7 @@ export default function Help() {
           </h4>
           <ol style={{ color: 'var(--text-steel)', paddingLeft: '20px' }}>
             <li>Go to <strong>Settings</strong></li>
-            <li>Leave the default Conda executable as <code style={{ color: 'var(--neon-cyan)' }}>conda.exe</code> unless your install needs a custom path</li>
+            <li>Leave the default Conda executable as <code style={{ color: 'var(--neon-cyan)' }}>conda</code> unless your install needs a custom path</li>
             <li>Leave the default environment name as <code style={{ color: 'var(--neon-cyan)' }}>nam</code> unless you intentionally created a different environment</li>
             <li>Choose an output directory</li>
             <li>Click <strong>Save Settings</strong></li>

@@ -111,7 +111,7 @@ export default function Settings() {
 
   const usingPathConda: boolean = Boolean(condaDiscovery?.isOnPath && !useCustomCondaPath)
   const displayedCondaPath: string = usingPathConda
-    ? (condaDiscovery?.resolvedPath || localSettings.condaExecutablePath || 'conda.exe')
+    ? (condaDiscovery?.resolvedPath || localSettings.condaExecutablePath || (window.namBot.platform === 'win32' ? 'conda.exe' : 'conda'))
     : (localSettings.condaExecutablePath || '')
 
   return (
@@ -141,7 +141,7 @@ export default function Settings() {
                 className={`btn btn-sm ${!useCustomCondaPath ? 'btn-green' : 'btn-secondary'}`}
                 onClick={() => {
                   setUseCustomCondaPath(false)
-                  setLocalSettings({ ...localSettings, condaExecutablePath: 'conda.exe' })
+                  setLocalSettings({ ...localSettings, condaExecutablePath: window.namBot.platform === 'win32' ? 'conda.exe' : 'conda' })
                 }}
               >
                 Use PATH
@@ -165,7 +165,7 @@ export default function Settings() {
               onChange={(e) => {
                 setLocalSettings({ ...localSettings, condaExecutablePath: e.target.value || null })
               }}
-              placeholder="C:\Users\...\miniconda3\Scripts\conda.exe"
+              placeholder={window.namBot.platform === 'win32' ? 'C:\\Users\\...\\miniconda3\\Scripts\\conda.exe' : '/opt/homebrew/bin/conda'}
               disabled={usingPathConda}
             />
             <button className="btn btn-secondary" onClick={chooseCondaPath} disabled={usingPathConda}>
@@ -234,7 +234,7 @@ export default function Settings() {
               onChange={(e) => {
                 setLocalSettings({ ...localSettings, pythonExecutablePath: e.target.value || null })
               }}
-              placeholder="C:\Users\...\python.exe"
+              placeholder={window.namBot.platform === 'win32' ? 'C:\\Users\\...\\python.exe' : '/usr/bin/python3'}
             />
           </div>
         )}

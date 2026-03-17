@@ -46,10 +46,13 @@ win:
   artifactName: ${productName}-Setup-${version}.${ext}
 mac:
   icon: build/icon.icns
+  category: public.app-category.music
   target:
     - target: dmg
       arch:
+        - arm64
         - x64
+  entitlementsInherit: build/entitlements.mac.plist
 nsis:
   include: build/installer.nsh
   oneClick: false

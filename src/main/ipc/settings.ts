@@ -81,10 +81,9 @@ export function setupIpcHandlers(): void {
     const result = await dialog.showOpenDialog({
       title: 'Select Conda Executable',
       properties: ['openFile'],
-      filters: [
-        { name: 'Executable', extensions: ['exe', 'bat', 'cmd'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
+      filters: process.platform === 'win32'
+        ? [{ name: 'Executable', extensions: ['exe', 'bat', 'cmd'] }, { name: 'All Files', extensions: ['*'] }]
+        : [{ name: 'All Files', extensions: ['*'] }]
     })
     
     if (result.canceled || result.filePaths.length === 0) {
@@ -111,10 +110,9 @@ export function setupIpcHandlers(): void {
     const result = await dialog.showOpenDialog({
       title: 'Select Python Executable',
       properties: ['openFile'],
-      filters: [
-        { name: 'Python', extensions: ['exe'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
+      filters: process.platform === 'win32'
+        ? [{ name: 'Python', extensions: ['exe'] }, { name: 'All Files', extensions: ['*'] }]
+        : [{ name: 'All Files', extensions: ['*'] }]
     })
     
     if (result.canceled || result.filePaths.length === 0) {

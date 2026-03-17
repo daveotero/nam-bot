@@ -240,11 +240,11 @@ function getRuntimePrefix(settings: AppSettings | null): string | null {
   switch (settings.backendMode) {
     case 'conda-name':
       return settings.environmentName
-        ? `${quoteShell(settings.condaExecutablePath ?? 'conda.exe')} run --name ${quoteShell(settings.environmentName)}`
+        ? `${quoteShell(settings.condaExecutablePath ?? (window.namBot.platform === 'win32' ? 'conda.exe' : 'conda'))} run --name ${quoteShell(settings.environmentName)}`
         : null
     case 'conda-prefix':
       return settings.environmentPrefixPath
-        ? `${quoteShell(settings.condaExecutablePath ?? 'conda.exe')} run --prefix ${quoteShell(settings.environmentPrefixPath)}`
+        ? `${quoteShell(settings.condaExecutablePath ?? (window.namBot.platform === 'win32' ? 'conda.exe' : 'conda'))} run --prefix ${quoteShell(settings.environmentPrefixPath)}`
         : null
     case 'direct-python':
       return settings.pythonExecutablePath ? quoteShell(settings.pythonExecutablePath) : null
@@ -992,7 +992,7 @@ export default function Diagnostics() {
           </div>
           <ol style={{ color: 'var(--text-steel)', paddingLeft: '20px', lineHeight: '1.8' }}>
             <li>Go to Settings and configure your Conda executable path</li>
-            <li>Use <strong>conda.exe</strong> on PATH or set a full Conda path in Settings</li>
+            <li>Use <strong>conda</strong> on PATH or set a full Conda path in Settings</li>
             <li>Set your Conda environment name or prefix. The default environment name is <strong>nam</strong></li>
             <li>Click "Re-check" to verify everything is working</li>
           </ol>

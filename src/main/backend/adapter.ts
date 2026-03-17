@@ -264,7 +264,7 @@ function detectHostNvidia(): Promise<HostNvidiaSummary> {
   })
 }
 
-export async function detectCondaOnPath(command = 'conda.exe'): Promise<CondaDiscoverySummary> {
+export async function detectCondaOnPath(command = process.platform === 'win32' ? 'conda.exe' : 'conda'): Promise<CondaDiscoverySummary> {
   const resolvedPath: string | null = await resolveExecutableOnPath(command)
 
   return {
