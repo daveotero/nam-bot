@@ -115,17 +115,27 @@ function sanitizeFilenameStem(jobName: string, jobId: string): string {
 }
 
 function buildPublishedModelStem(jobSpec: JobSpec): string {
-  const baseName = jobSpec.name
-  if (!jobSpec.appendPresetToModelFileName || !jobSpec.presetId) {
-    return sanitizeFilenameStem(baseName, jobSpec.id)
+  const segments = [jobSpec.name.trim()]
+
+  if (jobSpec.appendPresetToModelFileName && jobSpec.presetId) {
+    const presetName = getTrainingPresetById(jobSpec.presetId).name.trim()
+    if (presetName) {
+      segments.push(presetName)
+    }
   }
 
-  const presetName = getTrainingPresetById(jobSpec.presetId).name.trim()
-  if (!presetName) {
-    return sanitizeFilenameStem(baseName, jobSpec.id)
+  return sanitizeFilenameStem(segments.join(' - '), jobSpec.id)
+}
+
+function buildPublishedModelPath(runtime: JobRuntimeState, modelPath: string): string {
+  const segments = [buildPublishedModelStem(runtime.frozenJob)]
+  const bestValidationEsr = runtime.checkpointSummary?.bestValidationEsr
+
+  if (runtime.frozenJob.appendEsrToModelFileName && bestValidationEsr != null) {
+    segments.push(`ESR ${bestValidationEsr.toFixed(4)}`)
   }
 
-  return sanitizeFilenameStem(`${baseName} - ${presetName}`, jobSpec.id)
+  return join(dirname(modelPath), `${sanitizeFilenameStem(segments.join(' - '), runtime.frozenJob.id)}.nam`)
 }
 
 function stripTerminalControlSequences(value: string): string {
@@ -681,7 +691,7 @@ export class QueueManager extends EventEmitter {
       return
     }
 
-    const nextPath = join(dirname(modelPath), `${buildPublishedModelStem(runtime.frozenJob)}.nam`)
+    const nextPath = buildPublishedModelPath(runtime, modelPath)
     if (existsSync(nextPath)) {
       runtime.publishedModelPath = modelPath
       this.appendUserMessage(

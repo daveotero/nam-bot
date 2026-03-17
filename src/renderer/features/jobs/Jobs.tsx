@@ -54,8 +54,10 @@ import { handleCardToggleKeyDown, shouldIgnoreCardToggle } from '../../utils/car
 import { formatPresetNameWithRewardTag } from '../about/aboutRewardPreset'
 import {
   buildJobEditorSession,
+  getStoredAppendEsrToModelFileNamePreference,
   createNewJobDraft,
   getStoredAppendPresetToModelFileNamePreference,
+  LAST_APPEND_ESR_STORAGE_KEY,
   LAST_APPEND_PRESET_NAME_STORAGE_KEY,
   LAST_USED_PRESET_STORAGE_KEY,
   VIRTUAL_NEW_JOB_ID
@@ -338,6 +340,7 @@ export default function Jobs() {
     const visiblePresets = presets.filter((preset) => preset.visible)
     const storedPresetId = window.localStorage.getItem(LAST_USED_PRESET_STORAGE_KEY)
     const appendPresetToModelFileName = getStoredAppendPresetToModelFileNamePreference()
+    const appendEsrToModelFileName = getStoredAppendEsrToModelFileNamePreference()
     const fallbackPreset = visiblePresets.find((preset) => preset.id === storedPresetId)
       ?? visiblePresets.find((preset) => preset.id === DEFAULT_PRESET_ID)
       ?? visiblePresets[0]
@@ -348,6 +351,7 @@ export default function Jobs() {
         name: filenameWithoutExt(file.name),
         presetId: fallbackPreset?.id ?? DEFAULT_PRESET_ID,
         appendPresetToModelFileName,
+        appendEsrToModelFileName,
         inputAudioPath: defaultInputRef || '',
         outputAudioPath: filePath,
         outputRootDir: getDirname(filePath),
@@ -865,6 +869,10 @@ function JobEditor({
       LAST_APPEND_PRESET_NAME_STORAGE_KEY,
       editedJob.appendPresetToModelFileName ? 'true' : 'false'
     )
+    window.localStorage.setItem(
+      LAST_APPEND_ESR_STORAGE_KEY,
+      editedJob.appendEsrToModelFileName ? 'true' : 'false'
+    )
     await Promise.resolve(onSave(editedJob))
   }
 
@@ -1094,6 +1102,54 @@ function JobEditor({
               onBrowse={() => window.namBot.settings.chooseDirectory() as Promise<string | null>}
               error={showValidationErrors && !isRootDirValid}
             />
+
+            <div style={{ marginTop: '12px', padding: '12px', border: '1px solid var(--border-dim)', borderRadius: '8px', background: 'rgba(5, 17, 24, 0.45)' }}>
+              <p style={{ margin: 0, fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Final Model Filename
+              </p>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'var(--text-steel)', fontSize: '13px' }}>
+                  <input
+                    type="checkbox"
+                    checked={editedJob.appendPresetToModelFileName}
+                    onChange={(event) => {
+                      window.localStorage.setItem(
+                        LAST_APPEND_PRESET_NAME_STORAGE_KEY,
+                        event.target.checked ? 'true' : 'false'
+                      )
+                      onSessionChange({
+                        ...session,
+                        job: {
+                          ...editedJob,
+                          appendPresetToModelFileName: event.target.checked
+                        }
+                      })
+                    }}
+                  />
+                  <span>Append preset name</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '10px', color: 'var(--text-steel)', fontSize: '13px' }}>
+                  <input
+                    type="checkbox"
+                    checked={editedJob.appendEsrToModelFileName}
+                    onChange={(event) => {
+                      window.localStorage.setItem(
+                        LAST_APPEND_ESR_STORAGE_KEY,
+                        event.target.checked ? 'true' : 'false'
+                      )
+                      onSessionChange({
+                        ...session,
+                        job: {
+                          ...editedJob,
+                          appendEsrToModelFileName: event.target.checked
+                        }
+                      })
+                    }}
+                  />
+                  <span>Append final ESR</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* ── Training Settings ── */}
@@ -1138,29 +1194,6 @@ function JobEditor({
                     {selectedPreset.values.modelFamily} / {selectedPreset.values.architectureSize}. {selectedPreset.description}
                   </p>
                 )}
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', color: 'var(--text-steel)', fontSize: '13px' }}>
-                  <input
-                    type="checkbox"
-                    checked={editedJob.appendPresetToModelFileName}
-                    onChange={(event) => {
-                      window.localStorage.setItem(
-                        LAST_APPEND_PRESET_NAME_STORAGE_KEY,
-                        event.target.checked ? 'true' : 'false'
-                      )
-                      onSessionChange({
-                        ...session,
-                        job: {
-                          ...editedJob,
-                          appendPresetToModelFileName: event.target.checked
-                        }
-                      })
-                    }}
-                  />
-                  Append preset name to final `.nam` filename
-                </label>
-                <p style={{ color: 'var(--text-steel)', fontSize: '12px', marginTop: '6px' }}>
-                  When enabled, NAM-BOT renames the exported model to include both the job name and the selected preset name.
-                </p>
               </div>
 
               <div className="form-group">

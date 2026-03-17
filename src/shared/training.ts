@@ -76,6 +76,7 @@ export interface JobSpec {
   updatedAt: string
   presetId: string | null
   appendPresetToModelFileName: boolean
+  appendEsrToModelFileName: boolean
   inputAudioPath: string
   inputAudioIsDefault: boolean
   outputAudioPath: string
@@ -206,6 +207,7 @@ export const defaultJobSpec: Omit<JobSpec, 'id' | 'createdAt' | 'updatedAt'> = {
   name: 'New Job',
   presetId: DEFAULT_PRESET_ID,
   appendPresetToModelFileName: false,
+  appendEsrToModelFileName: false,
   inputAudioPath: '',
   inputAudioIsDefault: true,
   outputAudioPath: '',
@@ -651,6 +653,9 @@ export function normalizeJobSpec(value: unknown): JobSpec {
     presetId,
     appendPresetToModelFileName: typeof value.appendPresetToModelFileName === 'boolean'
       ? value.appendPresetToModelFileName
+      : false,
+    appendEsrToModelFileName: typeof value.appendEsrToModelFileName === 'boolean'
+      ? value.appendEsrToModelFileName
       : false,
     inputAudioPath: asString(value.inputAudioPath, ''),
     inputAudioIsDefault: typeof value.inputAudioIsDefault === 'boolean' ? value.inputAudioIsDefault : true,

@@ -47,7 +47,7 @@ Draft jobs are editable saved jobs that have not been frozen into the queue yet.
 - Saving an existing draft updates it through `jobs:saveDraft`.
 - Draft cards expose `Edit`, `Queue`, `Copy`, and `Delete`.
 - `Queue All` enqueues every valid draft and skips drafts missing required fields.
-- New jobs remember the last-used preset and the last-used exported-model naming preference to speed up repeated comparison runs.
+- New jobs remember the last-used preset and the last-used exported-model naming preferences to speed up repeated comparison runs.
 
 Drafts are where users can iterate safely before they commit a run to the queue.
 
@@ -77,8 +77,8 @@ The editor includes:
 - input audio source
 - output audio path
 - output root directory mode
+- final model filename options
 - preset selection
-- an optional checkbox to append the selected preset name to the final exported `.nam` filename
 - training overrides for epochs and latency
 - NAM metadata fields for the final `.nam` artifact
 
@@ -108,6 +108,21 @@ The output root directory can be driven in three ways:
   - uses the default output root from Settings when configured
 - `Custom`
   - lets the user browse to a specific directory
+
+### Final Model Filename
+
+The final exported `.nam` filename always starts with the job name.
+
+- `Append preset name`
+  - adds the selected preset name after the job name
+- `Append final ESR`
+  - adds the best validation ESR after the preset segment when enabled, or directly after the job name when preset naming is off
+
+The suffix order is fixed so filenames read consistently:
+
+- `Job Name`
+- `Job Name - Preset Name`
+- `Job Name - Preset Name - ESR 0.0123`
 
 ### Queue View
 
@@ -143,7 +158,7 @@ interface JobSpec {
   updatedAt: string
   presetId: string | null
   appendPresetToModelFileName: boolean
-  tags: string[]
+  appendEsrToModelFileName: boolean
   inputAudioPath: string
   inputAudioIsDefault: boolean
   outputAudioPath: string
@@ -174,8 +189,9 @@ interface JobSpec {
 - `outputRootDirIsDefault` tracks whether the root is following an automatic mode versus a custom folder choice.
 - `trainingOverrides` are intentionally narrow. Jobs override only the fields that need run-specific flexibility.
 - `metadata` is for NAM artifact tagging, not for configuring the core training recipe.
-- `appendPresetToModelFileName` controls whether the exported `.nam` file is renamed to include the selected preset name after training finishes.
-- New jobs seed `appendPresetToModelFileName` from the user's most recent checkbox choice in the job editor.
+- `appendPresetToModelFileName` controls whether the exported `.nam` file includes the selected preset name after the job name.
+- `appendEsrToModelFileName` controls whether the exported `.nam` file includes the best validation ESR after training finishes.
+- New jobs seed both filename options from the user's most recent checkbox choices in the job editor.
 
 ## Runtime State
 

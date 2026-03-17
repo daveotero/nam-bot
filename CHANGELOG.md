@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-03-16
+
+### Added
+
+- Job editor option to append the final validation ESR to the exported `.nam` filename after training finishes
+
+### Changed
+
+- Exported model filenames now follow a consistent suffix order: job name, preset name, then ESR
+- Jobs screen groups the preset-name and ESR filename options into one `Final Model Filename` section below the output root directory controls
+- Jobs documentation updated for the new filename options and ordering
+
 ## [0.3.4] - 2026-03-16
 
 ### Added
