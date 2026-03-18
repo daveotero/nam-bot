@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  Windows desktop control room for local Neural Amp Modeler training.
+  Desktop control room for local Neural Amp Modeler training.
 </p>
 
 NAM-BOT is an Electron desktop app that wraps the local Neural Amp Modeler training workflow in a friendlier UI. It is meant to keep the fun, tinkery side of local NAM training alive while making the process less intimidating for people who do not want to live in a terminal just to get started.
@@ -48,18 +48,27 @@ NAM-BOT tries to make local training smoother by giving you:
 
 ## Platform And Requirements
 
+**Windows**
+
 - Windows 10 or Windows 11, x64
 - [Miniconda or Anaconda](https://www.anaconda.com/download), unless you already run NAM another way
 - A Python environment with `neural-amp-modeler` installed
 - NVIDIA GPU recommended if you want faster local training
+
+**macOS (beta)**
+
+- Apple Silicon (`arm64`) and Intel (`x64`) builds are available as separate DMGs
+- Use Terminal and the `conda` command rather than Command Prompt / PowerShell and `conda.exe`
+- Apple Silicon users should choose Apple Silicon Miniconda and expect MPS diagnostics rather than CUDA-first messaging
+- Current macOS DMGs are unsigned beta builds and may require right-click `Open` on first launch
 
 ## Install
 
 For a public repository, the typical user-friendly path is:
 
 1. Open the GitHub Releases page.
-2. Download the latest Windows installer.
-3. Run the installer and launch NAM-BOT.
+2. Download the latest Windows installer if you are on Windows, or the matching `arm64` / `x64` DMG if you are on macOS.
+3. Run the installer on Windows, or open the DMG and move NAM-BOT into Applications on macOS.
 
 ## Setup Overview
 
@@ -85,6 +94,8 @@ If you do not already have a local NAM environment, NAM-BOT will help walk you t
 2. Create a Conda environment named `nam`.
 3. Install `neural-amp-modeler` into that environment.
 4. Open NAM-BOT and let Diagnostics confirm the setup.
+
+On macOS, use Terminal for those commands. On Apple Silicon, choose the Apple Silicon Miniconda installer and treat MPS as the expected accelerator path.
 
 ### Manual Setup Reference
 
@@ -123,8 +134,8 @@ It checks a few predetermined paths first, including:
 
 - Whether NAM-BOT can actually reach Conda
 - Whether the selected environment is reachable
-- Whether Python, NAM, torch, CUDA, and Lightning look healthy inside that environment
-- Whether the host machine itself exposes an NVIDIA GPU
+- Whether Python, NAM, torch, CUDA / MPS, and Lightning look healthy inside that environment
+- Whether the host machine itself exposes an NVIDIA GPU when CUDA-oriented checks apply
 
 When it spots a likely GPU or environment problem, it gives you ready-to-paste commands for the most common fix paths. That covers a lot of the usual Windows, Conda, and torch mismatch issues without making you search around manually.
 

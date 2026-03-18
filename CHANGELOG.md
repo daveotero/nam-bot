@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-18
+
+### Added
+
+- macOS beta support with packaged `arm64` and `x64` DMG outputs, platform-aware backend defaults, and macOS CI build coverage
+- Maintainer-run `Release macOS Beta` workflow so macOS DMGs can be attached to an existing tagged release after verification
+- Maintainer-facing macOS support notes under `docs/`
+
+### Changed
+
+- Setup guidance, settings copy, and diagnostics documentation now include macOS terminology such as Terminal, Apple Silicon, MPS, and Finder where relevant
+- Release workflow now keeps the normal `v*` tag path focused on Windows while allowing macOS beta assets to lag behind until they are explicitly built and reviewed
+
+### Fixed
+
+- Conda detection, file-picker behavior, and renderer fallback paths so backend setup no longer assumes Windows-only executable names on macOS
+
 ## [0.3.6] - 2026-03-17
 
 ### Changed
