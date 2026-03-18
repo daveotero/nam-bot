@@ -7,14 +7,14 @@ The Diagnostics screen is NAM-BOT's main environment-health page.
 It is designed to answer two practical questions before or during training:
 
 - can NAM-BOT actually reach the configured NAM backend
-- can that backend use the accelerator path you expect, especially CUDA on Windows
+- can that backend use the accelerator path you expect, especially CUDA on Windows or MPS on Apple Silicon
 
 The screen is intentionally split into backend validation and accelerator diagnostics so users can tell the difference between "NAM is not set up correctly" and "NAM works, but GPU support is not healthy yet."
 
 ## Goals
 
 - Give users a fast pass/fail check for the currently selected backend target.
-- Explain common Conda, Python, NAM, torch, and CUDA problems in plain language.
+- Explain common Conda, Python, NAM, torch, and accelerator problems in plain language.
 - Provide copyable commands for the most likely fixes without forcing users to build commands by hand.
 - Export enough context for deeper troubleshooting in support threads or LLM tools when the built-in guidance is not enough.
 
@@ -59,6 +59,12 @@ This panel is meant to answer "Can NAM-BOT actually run the configured training 
 
 The second panel focuses on torch and hardware visibility.
 
+The exact meaning depends on the machine:
+
+- Windows + NVIDIA users will mostly care about CUDA visibility.
+- Apple Silicon users will mostly care about MPS visibility.
+- CPU-only systems may still be healthy if no supported accelerator is expected.
+
 The summary banner collapses the result into one of a few user-facing states:
 
 - `GPU READY`
@@ -81,9 +87,9 @@ When expanded, the panel shows the concrete probe facts that NAM-BOT collected, 
 - host NVIDIA visibility and driver info
 - torch import state, version, and CUDA build
 - CUDA availability and device count
+- MPS availability on supported macOS systems
 - NAM import state and version
 - Lightning package state and CUDA agreement
-- MPS availability
 
 This is the "what did the app actually see?" layer of the screen.
 
@@ -167,6 +173,7 @@ Start with the accelerator panel.
 
 - if the machine is intended to be CPU-only, `CPU-ONLY TORCH` may be completely acceptable
 - if the machine should use NVIDIA CUDA, pay attention to torch build state, CUDA availability, and host NVIDIA visibility
+- if the machine is Apple Silicon, pay attention to the reported `MPS available` field rather than NVIDIA host checks
 - if torch sees CUDA but Lightning does not, inspect package mismatch rather than reinstalling NAM immediately
 
 ### If The Built-In Fixes Are Not Enough

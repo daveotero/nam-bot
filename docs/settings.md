@@ -13,7 +13,7 @@ Settings in NAM-BOT are **automatically saved** as you type. There is no manual 
 
 ### Backend Configuration
 
-- **Conda Executable Path**: Path to `conda.exe` or `mamba.exe`.
+- **Conda Executable Path**: Path to the Conda executable NAM-BOT should use. On Windows this is often `conda.exe`; on macOS it is usually `conda`.
 - **Backend Mode**: Choose between using a named Conda environment, a prefix path, or a direct Python executable.
 - **Environment/Python Path**: Specific identifiers for your NAM environment.
 
@@ -29,6 +29,7 @@ Settings in NAM-BOT are **automatically saved** as you type. There is no manual 
 
 ### Application Settings
 
-- **Automatically open results folder**: Triggers a file explorer window once training completes.
+- **Automatically open results folder**: Opens the completed run folder in your system file browser once training finishes.
+  On Windows this usually means File Explorer. On macOS this means Finder.
 - **Persist queue on exit**: Saves the current job queue to disk so it can be restored on next launch.
 - **Log Retention**: How many days to keep training logs before cleanup.

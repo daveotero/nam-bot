@@ -210,6 +210,17 @@ export default function Help() {
             </p>
           </div>
 
+          <div style={{
+            backgroundColor: 'rgba(0, 243, 255, 0.05)',
+            padding: '12px',
+            borderLeft: '4px solid var(--neon-cyan)',
+            marginBottom: '16px'
+          }}>
+            <p style={{ color: 'var(--text-steel)', margin: 0, fontSize: '14px' }}>
+              <strong>macOS note:</strong> use <strong>Terminal</strong> instead of Command Prompt or PowerShell, expect the Conda command to be <code style={{ color: 'var(--neon-cyan)' }}>conda</code>, and on Apple Silicon the accelerator path is <strong>MPS</strong> rather than CUDA.
+            </p>
+          </div>
+
           <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '16px', marginBottom: '8px' }}>
             1. Open Settings
           </h4>
@@ -294,6 +305,9 @@ export default function Help() {
               If prompted, allow Miniconda to add itself to PATH.
             </p>
           </div>
+          <p style={{ color: 'var(--text-steel)', fontSize: '13px', marginTop: '-4px', marginBottom: '16px' }}>
+            On Apple Silicon, choose the Apple Silicon installer. On macOS beta builds, you may need to right-click the app and choose <strong>Open</strong> on first launch if Gatekeeper warns about an unsigned app.
+          </p>
 
           <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>
             2. Create NAM Environment
@@ -337,6 +351,9 @@ export default function Help() {
           </h4>
           <p style={{ color: 'var(--text-steel)' }}>
             NAM-BOT validates the backend automatically on startup. You can always go to <strong>Diagnostics</strong> and click <strong>Re-check</strong> to inspect both backend readiness and GPU visibility.
+          </p>
+          <p style={{ color: 'var(--text-steel)', fontSize: '13px', marginTop: '8px' }}>
+            On Windows, GPU diagnostics mostly focus on CUDA and NVIDIA visibility. On Apple Silicon, the same screen also reports whether PyTorch can see <strong>MPS</strong>.
           </p>
 
           <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>

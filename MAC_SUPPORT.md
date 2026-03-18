@@ -5,6 +5,7 @@ macOS support added by **Alex Nasla** ([@alexnasla](https://linktr.ee/alexnasla)
 ## What Was Changed
 
 ### 1. `build/icon.icns`
+
 Generated from `build/icon.png` using macOS built-in tools (`sips` + `iconutil`).
 electron-builder requires a proper `.icns` file for macOS builds — the original repo only included `.ico` (Windows) and `.png`.
 
@@ -24,6 +25,7 @@ iconutil -c icns /tmp/icon.iconset -o build/icon.icns
 ```
 
 ### 2. `electron-builder.yml` — Mac targets
+
 - Added `arm64` target alongside `x64` (Apple Silicon support)
 - Added `category: public.app-category.music`
 - Added `entitlementsInherit` pointing to the new plist
@@ -31,20 +33,27 @@ iconutil -c icns /tmp/icon.iconset -o build/icon.icns
 **Note on Universal Binary:** A universal (single fat binary) build was attempted but blocked by `node-pty`'s prebuilt native binaries — `@electron/universal` can't merge separate arm64/x64 `.node` files without a custom `afterPack` hook. Shipping two separate DMGs is the standard workaround for apps with native modules.
 
 ### 3. `build/entitlements.mac.plist`
+
 Required for all Electron apps on macOS with hardened runtime. Grants:
+
 - JIT compilation (required by V8/JavaScript engine)
 - Unsigned executable memory (required by V8)
 - Library validation disabled (required for `node-pty` native addon)
 
 ### 4. `src/main/types/index.ts` — Platform-aware Conda default
+
 Original default was `'conda.exe'` (Windows-only path). Changed to:
+
 ```typescript
 condaExecutablePath: process.platform === 'win32' ? 'conda.exe' : 'conda'
 ```
+
 Without this fix, the app silently fails to find Conda on macOS.
 
 ### 5. `package.json` — Build scripts
+
 Added:
+
 ```json
 "package:mac": "electron-vite build && electron-builder --mac --config electron-builder.yml",
 "package:win": "electron-vite build && electron-builder --win --config electron-builder.yml"
@@ -53,6 +62,7 @@ Added:
 ## Building for macOS
 
 Requirements:
+
 - macOS (must build on Mac for macOS targets)
 - Node.js + npm
 - Xcode Command Line Tools (`xcode-select --install`)
