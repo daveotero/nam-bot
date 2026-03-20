@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-type GuideMode = 'standard' | 'nvidia' | 'apple'
+type GuideMode = 'standard' | 'nvidia' | 'apple' | 'amd'
 
 interface CodeBlockProps {
   label: string
@@ -23,6 +23,11 @@ const guideOptions: GuideOption[] = [
     id: 'nvidia',
     label: 'NVIDIA CUDA',
     description: 'Use this if you have an NVIDIA GPU and want local CUDA acceleration for training.'
+  },
+  {
+    id: 'amd',
+    label: 'AMD ROCm (Windows)',
+    description: 'Use this if you have an AMD Radeon RX 7000/9000 or PRO W7000 series GPU on Windows.'
   },
   {
     id: 'apple',
@@ -131,6 +136,21 @@ function renderGuideIntro(mode: GuideMode): JSX.Element {
     )
   }
 
+  if (mode === 'amd') {
+    return (
+      <div style={{
+        backgroundColor: 'rgba(0, 243, 255, 0.05)',
+        padding: '12px',
+        borderLeft: '4px solid var(--neon-cyan)',
+        marginBottom: '16px'
+      }}>
+        <p style={{ color: 'var(--text-steel)', margin: 0, fontSize: '14px' }}>
+          <strong>AMD ROCm path:</strong> Requires Python 3.12 and official AMD ROCm wheels. This installs ROCm-enabled PyTorch for AMD GPU acceleration on Windows.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       backgroundColor: 'rgba(255, 0, 65, 0.05)',
@@ -164,6 +184,36 @@ function renderTorchInstall(mode: GuideMode): JSX.Element {
         <p style={{ color: 'var(--text-steel)', fontSize: '12px', marginTop: '-8px', marginBottom: '16px' }}>
           Expected result: the version string should include <strong>+cu130</strong> and <strong>torch.cuda.is_available()</strong> should print <strong>True</strong>.
         </p>
+      </>
+    )
+  }
+
+  if (mode === 'amd') {
+    return (
+      <>
+        <CopyableCodeBlock
+          label="Step C: Create Python 3.12 Environment"
+          command="conda create -n nam python=3.12 -y && conda activate nam"
+        />
+        <CopyableCodeBlock
+          label="Step D: Install ROCm SDK Core"
+          command="pip install --no-cache-dir https://repo.radeon.com/rocm/windows/rocm-rel-7.2/rocm_sdk_core-7.2.0.dev0-py3-none-win_amd64.whl"
+        />
+        <CopyableCodeBlock
+          label="Step E: Install ROCm PyTorch"
+          command="pip install --no-cache-dir https://repo.radeon.com/rocm/windows/rocm-rel-7.2/torch-2.9.1%2Brocmsdk20260116-cp312-cp312-win_amd64.whl"
+        />
+        <CopyableCodeBlock
+          label="Step F: Verify ROCm PyTorch"
+          command={'python -c "import torch; print(\'CUDA Available:\', torch.cuda.is_available()); print(\'HIP Version:\', torch.version.hip)"'}
+        />
+        <p style={{ color: 'var(--text-steel)', fontSize: '12px', marginTop: '-8px', marginBottom: '16px' }}>
+          Expected result: <strong>CUDA Available: True</strong> and <strong>HIP Version:</strong> shows a version string. Note: torch.version.cuda will be None for ROCm builds.
+        </p>
+        <CopyableCodeBlock
+          label="Step G: Install Neural Amp Modeler"
+          command="pip install neural-amp-modeler"
+        />
       </>
     )
   }
@@ -309,31 +359,37 @@ export default function Help() {
             On Apple Silicon, choose the Apple Silicon installer. On macOS beta builds, you may need to right-click the app and choose <strong>Open</strong> on first launch if Gatekeeper warns about an unsigned app.
           </p>
 
-          <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>
-            2. Create NAM Environment
-          </h4>
-          <p style={{ color: 'var(--text-steel)', marginBottom: '16px' }}>
-            Open Terminal on macOS, or Command Prompt / PowerShell on Windows, and run these commands <strong>one at a time</strong>:
-          </p>
+          {guideMode !== 'amd' && (
+            <>
+              <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>
+                2. Create NAM Environment
+              </h4>
+              <p style={{ color: 'var(--text-steel)', marginBottom: '16px' }}>
+                Open Terminal on macOS, or Command Prompt / PowerShell on Windows, and run these commands <strong>one at a time</strong>:
+              </p>
 
-          <CopyableCodeBlock
-            label="Step A: Create Environment"
-            command="conda create -n nam python=3.11 -y"
-          />
-          <CopyableCodeBlock
-            label="Step B: Activate"
-            command="conda activate nam"
-          />
+              <CopyableCodeBlock
+                label="Step A: Create Environment"
+                command="conda create -n nam python=3.11 -y"
+              />
+              <CopyableCodeBlock
+                label="Step B: Activate"
+                command="conda activate nam"
+              />
+            </>
+          )}
 
           <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>
             3. Install PyTorch for This Machine
           </h4>
           {renderTorchInstall(guideMode)}
 
-          <CopyableCodeBlock
-            label={guideMode === 'nvidia' ? 'Step F: Install Neural Amp Modeler' : 'Step D: Install Neural Amp Modeler'}
-            command="pip install neural-amp-modeler"
-          />
+          {guideMode !== 'amd' && (
+            <CopyableCodeBlock
+              label={guideMode === 'nvidia' ? 'Step F: Install Neural Amp Modeler' : 'Step D: Install Neural Amp Modeler'}
+              command="pip install neural-amp-modeler"
+            />
+          )}
 
           <h4 style={{ fontFamily: 'var(--font-arcade)', color: 'var(--neon-cyan)', marginTop: '24px', marginBottom: '8px' }}>
             4. Configure NAM-BOT
