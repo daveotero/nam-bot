@@ -358,7 +358,10 @@ function getAcceleratorLabelForIssue(issue: AcceleratorDiagnosticsSummary['issue
   if (issue === 'rocm_ready') {
     return '✓ ROCM GPU READY'
   }
-  return getAcceleratorLabel(issue === 'ready' ? 'ready' : 'error')
+  if (issue === 'cuda_ready' || issue === 'mps_ready') {
+    return '✓ GPU READY'
+  }
+  return getAcceleratorLabel('error')
 }
 
 function getAcceleratorGuidance(
