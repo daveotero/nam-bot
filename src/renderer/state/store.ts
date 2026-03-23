@@ -135,6 +135,16 @@ export interface CondaDiscoverySummary {
   resolvedPath: string | null
 }
 
+export interface NamVersionInfo {
+  installedVersion: string | null
+  latestVersion: string | null
+  isUpToDate: boolean | null
+  latestReleaseUrl: string | null
+  publishedAt: string | null
+  checkStatus: 'ok' | 'offline' | 'rate_limited' | 'error'
+  errorMessage?: string
+}
+
 export type PresetEditorMode = 'manual' | 'import'
 
 export interface PresetEditorSession {
@@ -165,6 +175,7 @@ interface AppState {
   validation: BackendValidationSummary | null
   acceleratorDiagnostics: AcceleratorDiagnosticsSummary | null
   condaDiscovery: CondaDiscoverySummary | null
+  namVersionInfo: NamVersionInfo | null
   updateStatus: UpdateStatus
   presets: TrainingPresetFile[]
   presetEditorSession: PresetEditorSession | null
@@ -179,6 +190,7 @@ interface AppState {
   setValidation: (validation: BackendValidationSummary) => void
   setAcceleratorDiagnostics: (diagnostics: AcceleratorDiagnosticsSummary) => void
   setCondaDiscovery: (condaDiscovery: CondaDiscoverySummary) => void
+  setNamVersionInfo: (namVersionInfo: NamVersionInfo | null) => void
   setUpdateStatus: (updateStatus: UpdateStatus) => void
   setPresets: (presets: TrainingPresetFile[]) => void
   setPresetEditorSession: (session: PresetEditorSession | null) => void
@@ -195,6 +207,7 @@ interface AppState {
   saveSettings: (settings: AppSettings) => Promise<void>
   validateBackend: () => Promise<void>
   loadAcceleratorDiagnostics: () => Promise<void>
+  loadNamVersionInfo: () => Promise<void>
   detectConda: () => Promise<void>
   loadUpdateStatus: () => Promise<void>
   loadPresets: () => Promise<void>
@@ -207,6 +220,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   validation: null,
   acceleratorDiagnostics: null,
   condaDiscovery: null,
+  namVersionInfo: null,
   updateStatus: createDefaultUpdateStatus('0.0.0'),
   presets: [],
   presetEditorSession: null,
@@ -221,6 +235,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setValidation: (validation) => set({ validation }),
   setAcceleratorDiagnostics: (acceleratorDiagnostics) => set({ acceleratorDiagnostics }),
   setCondaDiscovery: (condaDiscovery) => set({ condaDiscovery }),
+  setNamVersionInfo: (namVersionInfo) => set({ namVersionInfo }),
   setUpdateStatus: (updateStatus) => set({ updateStatus }),
   setPresets: (presets) => set({ presets: sortPresets(presets) }),
   setPresetEditorSession: (presetEditorSession) => set({ presetEditorSession }),
@@ -283,6 +298,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('Failed to load accelerator diagnostics:', error)
     } finally {
       set({ isAcceleratorDiagnosticsLoading: false })
+    }
+  },
+
+  loadNamVersionInfo: async () => {
+    try {
+      const namVersionInfo = await window.namBot.settings.getNamVersionInfo() as NamVersionInfo
+      set({ namVersionInfo })
+    } catch (error) {
+      console.error('Failed to load NAM version info:', error)
+      set({ namVersionInfo: null })
     }
   },
 

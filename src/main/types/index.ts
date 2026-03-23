@@ -114,3 +114,13 @@ export interface CondaDiscoverySummary {
   command: string
   resolvedPath: string | null
 }
+
+export interface NamVersionInfo {
+  installedVersion: string | null
+  latestVersion: string | null
+  isUpToDate: boolean | null
+  latestReleaseUrl: string | null
+  publishedAt: string | null
+  checkStatus: 'ok' | 'offline' | 'rate_limited' | 'error'
+  errorMessage?: string
+}

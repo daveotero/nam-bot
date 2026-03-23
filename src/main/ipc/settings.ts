@@ -1,8 +1,8 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import log from 'electron-log/main'
 import { loadSettings, saveSettings } from '../persistence/settingsStore'
-import { detectCondaOnPath, inspectAcceleratorDiagnostics, validateBackend } from '../backend/adapter'
-import { AppSettings } from '../types'
+import { detectCondaOnPath, getNamVersionInfo, inspectAcceleratorDiagnostics, validateBackend } from '../backend/adapter'
+import { AppSettings, NamVersionInfo } from '../types'
 import { getQueueManager } from '../jobs/queueManager'
 
 let cachedSettings: AppSettings | null = null
@@ -74,6 +74,25 @@ export function setupIpcHandlers(): void {
     } catch (error) {
       log.error('Failed to inspect accelerator diagnostics:', error)
       throw error
+    }
+  })
+
+  ipcMain.handle('settings:getNamVersionInfo', async (): Promise<NamVersionInfo> => {
+    try {
+      const settings: AppSettings = cachedSettings || loadSettings()
+      cachedSettings = settings
+      return await getNamVersionInfo(settings)
+    } catch (error) {
+      log.error('Failed to get NAM version info:', error)
+      return {
+        installedVersion: null,
+        latestVersion: null,
+        isUpToDate: null,
+        latestReleaseUrl: null,
+        publishedAt: null,
+        checkStatus: 'error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      }
     }
   })
 

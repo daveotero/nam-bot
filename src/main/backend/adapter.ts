@@ -1,15 +1,18 @@
 import { ChildProcess, execFileSync, execFile, spawn, SpawnOptionsWithoutStdio } from 'child_process'
+import https from 'https'
+import { app } from 'electron'
 import log from 'electron-log/main'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawn as spawnPty, IPty } from 'node-pty'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import {
   AcceleratorDiagnosticsSummary,
   AppSettings,
   BackendCheckResult,
   BackendValidationSummary,
-  CondaDiscoverySummary
+  CondaDiscoverySummary,
+  NamVersionInfo
 } from '../types'
 
 export interface RunHooks {
@@ -63,6 +66,7 @@ export interface TrainingProcessController {
 export interface NamBackendAdapter {
   validateConnection(settings: AppSettings): Promise<BackendValidationSummary>
   detectNamVersion(settings: AppSettings): Promise<string | null>
+  getNamVersionInfo(settings: AppSettings): Promise<NamVersionInfo>
   runHelloWorld(settings: AppSettings): Promise<{ ok: boolean; output: string }>
   inspectTorchRuntime(settings: AppSettings): Promise<TorchRuntimeSummary | null>
   inspectAcceleratorDiagnostics(settings: AppSettings): Promise<AcceleratorDiagnosticsSummary>
@@ -1132,4 +1136,252 @@ export async function runNamFull(
       }
     })
   })
+}
+
+interface GitHubRelease {
+  tag_name: string
+  html_url: string
+  published_at: string
+}
+
+interface VersionCache {
+  version: string
+  url: string
+  publishedAt: string
+  checkedAt: number
+}
+
+const VERSION_CACHE_FILE = join(app.getPath('userData'), 'nam-version-cache.json')
+const VERSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+function loadVersionCache(): VersionCache | null {
+  try {
+    if (!existsSync(VERSION_CACHE_FILE)) {
+      return null
+    }
+    const data = JSON.parse(readFileSync(VERSION_CACHE_FILE, 'utf8')) as VersionCache
+    const age = Date.now() - data.checkedAt
+    if (age > VERSION_CACHE_TTL_MS) {
+      log.info('NAM version cache expired')
+      return null
+    }
+    return data
+  } catch (error) {
+    log.warn('Failed to load NAM version cache:', error)
+    return null
+  }
+}
+
+function saveVersionCache(cache: VersionCache): void {
+  try {
+    const cacheDir = dirname(VERSION_CACHE_FILE)
+    if (!existsSync(cacheDir)) {
+      mkdirSync(cacheDir, { recursive: true })
+    }
+    writeFileSync(VERSION_CACHE_FILE, JSON.stringify(cache, null, 2), 'utf8')
+  } catch (error) {
+    log.warn('Failed to save NAM version cache:', error)
+  }
+}
+
+export async function fetchLatestNamVersion(): Promise<{
+  version: string
+  url: string
+  publishedAt: string
+  status: 'ok' | 'offline' | 'rate_limited' | 'error'
+  errorMessage?: string
+} | null> {
+  const cached = loadVersionCache()
+  if (cached) {
+    log.info('Using cached NAM version:', cached.version)
+    return {
+      version: cached.version,
+      url: cached.url,
+      publishedAt: cached.publishedAt,
+      status: 'ok'
+    }
+  }
+
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/sdatkinson/neural-amp-modeler/releases/latest',
+      method: 'GET',
+      headers: {
+        'User-Agent': 'NAM-BOT',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+
+      if (res.statusCode === 403) {
+        log.warn('GitHub API rate limited')
+        resolve({
+          version: '',
+          url: '',
+          publishedAt: '',
+          status: 'rate_limited',
+          errorMessage: 'GitHub API rate limit exceeded. Try again later.'
+        })
+        return
+      }
+
+      if (res.statusCode !== 200) {
+        log.warn('Failed to fetch latest NAM version, status:', res.statusCode)
+        resolve({
+          version: '',
+          url: '',
+          publishedAt: '',
+          status: 'error',
+          errorMessage: `Failed to fetch latest version (HTTP ${res.statusCode})`
+        })
+        return
+      }
+
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+
+      res.on('end', () => {
+        try {
+          const release = JSON.parse(data) as GitHubRelease
+          const version = release.tag_name.replace(/^v/, '')
+          const result = {
+            version,
+            url: release.html_url,
+            publishedAt: release.published_at,
+            status: 'ok' as const
+          }
+          
+          saveVersionCache({
+            version,
+            url: release.html_url,
+            publishedAt: release.published_at,
+            checkedAt: Date.now()
+          })
+          
+          resolve(result)
+        } catch (error) {
+          log.error('Failed to parse GitHub release:', error)
+          resolve({
+            version: '',
+            url: '',
+            publishedAt: '',
+            status: 'error',
+            errorMessage: 'Failed to parse GitHub release data'
+          })
+        }
+      })
+    })
+
+    req.on('error', (error) => {
+      log.error('Failed to fetch latest NAM version:', error)
+      resolve({
+        version: '',
+        url: '',
+        publishedAt: '',
+        status: 'offline',
+        errorMessage: error.message
+      })
+    })
+
+    req.setTimeout(10000, () => {
+      req.destroy()
+      resolve({
+        version: '',
+        url: '',
+        publishedAt: '',
+        status: 'offline',
+        errorMessage: 'Request timed out'
+      })
+    })
+
+    req.end()
+  })
+}
+
+export async function detectNamVersion(settings: AppSettings): Promise<string | null> {
+  const script = [
+    'import json',
+    'import nam',
+    "version = getattr(nam, '__version__', None)",
+    'print(json.dumps({\'version\': version}))'
+  ].join('\n')
+
+  const result = await runPythonScriptInEnvironment(settings, script, 'nam-version-probe.py')
+  if (!result.ok) {
+    log.warn('Failed to detect NAM version:', result.output)
+    return null
+  }
+
+  try {
+    const line = result.output.split(/\r?\n/).find((entry) => entry.trim().startsWith('{'))
+    if (!line) {
+      return null
+    }
+    const payload = JSON.parse(line.trim())
+    return payload.version ?? null
+  } catch (error) {
+    log.warn('Failed to parse NAM version:', error)
+    return null
+  }
+}
+
+export async function getNamVersionInfo(settings: AppSettings): Promise<NamVersionInfo> {
+  const [installedVersion, latestResult] = await Promise.all([
+    detectNamVersion(settings),
+    fetchLatestNamVersion()
+  ])
+
+  if (!latestResult) {
+    return {
+      installedVersion,
+      latestVersion: null,
+      isUpToDate: null,
+      latestReleaseUrl: null,
+      publishedAt: null,
+      checkStatus: 'error',
+      errorMessage: 'Failed to fetch latest version'
+    }
+  }
+
+  if (latestResult.status !== 'ok') {
+    return {
+      installedVersion,
+      latestVersion: null,
+      isUpToDate: null,
+      latestReleaseUrl: null,
+      publishedAt: null,
+      checkStatus: latestResult.status,
+      errorMessage: latestResult.errorMessage
+    }
+  }
+
+  const isUpToDate = installedVersion !== null && compareVersions(installedVersion, latestResult.version) >= 0
+
+  return {
+    installedVersion,
+    latestVersion: latestResult.version,
+    isUpToDate,
+    latestReleaseUrl: latestResult.url,
+    publishedAt: latestResult.publishedAt,
+    checkStatus: 'ok'
+  }
+}
+
+function compareVersions(a: string, b: string): number {
+  const aParts = a.split('.').map((part) => parseInt(part.replace(/[^0-9]/g, ''), 10) || 0)
+  const bParts = b.split('.').map((part) => parseInt(part.replace(/[^0-9]/g, ''), 10) || 0)
+  
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    const aPart = aParts[i] ?? 0
+    const bPart = bParts[i] ?? 0
+    if (aPart !== bPart) {
+      return aPart - bPart
+    }
+  }
+  
+  return 0
 }

@@ -4,6 +4,7 @@ import {
   AppSettings,
   BackendCheckResult,
   BackendValidationSummary,
+  NamVersionInfo,
   useAppStore
 } from '../../state/store'
 
@@ -651,6 +652,74 @@ function buildAiTroubleshootingPrompt(
   ].join('\n')
 }
 
+function getUpgradeCommands(settings: AppSettings | null): CopyableCodeBlockProps[] {
+  const activationCommand = getEnvironmentActivationCommand(settings)
+  const commands: CopyableCodeBlockProps[] = []
+
+  if (activationCommand) {
+    commands.push({
+      label: 'Activate Environment',
+      command: activationCommand
+    })
+  }
+
+  commands.push({
+    label: 'Upgrade NAM',
+    command: buildPipCommand(settings, 'install --upgrade neural-amp-modeler')
+  })
+
+  commands.push({
+    label: 'Verify Upgrade',
+    command: buildPythonInlineCommand(settings, "import nam; print(getattr(nam, '__version__', None))")
+  })
+
+  return commands
+}
+
+function getVersionStatusBadge(namVersionInfo: NamVersionInfo | null): {
+  label: string
+  color: string
+  icon: string
+} {
+  if (!namVersionInfo) {
+    return {
+      label: 'Checking...',
+      color: 'var(--text-steel)',
+      icon: '…'
+    }
+  }
+
+  if (namVersionInfo.checkStatus !== 'ok') {
+    return {
+      label: 'Unable to check',
+      color: 'var(--text-steel)',
+      icon: '?'
+    }
+  }
+
+  if (namVersionInfo.isUpToDate === true) {
+    return {
+      label: 'Up to date',
+      color: 'var(--neon-green)',
+      icon: '✓'
+    }
+  }
+
+  if (namVersionInfo.isUpToDate === false) {
+    return {
+      label: 'Update available',
+      color: 'var(--neon-cyan)',
+      icon: '↑'
+    }
+  }
+
+  return {
+    label: 'Unknown',
+    color: 'var(--text-steel)',
+    icon: '?'
+  }
+}
+
 function getExportPanelCopy(
   validation: BackendValidationSummary | null,
   acceleratorDiagnostics: AcceleratorDiagnosticsSummary | null
@@ -688,17 +757,20 @@ export default function Diagnostics() {
     settings,
     validation,
     acceleratorDiagnostics,
+    namVersionInfo,
     isLoading,
     isAcceleratorDiagnosticsLoading,
     loadSettings,
     validateBackend,
-    loadAcceleratorDiagnostics
+    loadAcceleratorDiagnostics,
+    loadNamVersionInfo
   } = useAppStore()
 
   const isChecking = isLoading || isAcceleratorDiagnosticsLoading
   const [showAiPrompt, setShowAiPrompt] = useState(false)
   const [showRawJson, setShowRawJson] = useState(false)
   const [showAcceleratorExtended, setShowAcceleratorExtended] = useState(false)
+  const [showUpgradeSteps, setShowUpgradeSteps] = useState(false)
   const acceleratorGuidance = getAcceleratorGuidance(acceleratorDiagnostics, settings)
   const exportPanelCopy = getExportPanelCopy(validation, acceleratorDiagnostics)
   const showTroubleshootingExport = shouldShowTroubleshootingExport(validation, acceleratorDiagnostics)
@@ -715,7 +787,10 @@ export default function Diagnostics() {
     if (!acceleratorDiagnostics) {
       void loadAcceleratorDiagnostics()
     }
-  }, [acceleratorDiagnostics, loadAcceleratorDiagnostics, loadSettings, settings, validation, validateBackend])
+    if (!namVersionInfo) {
+      void loadNamVersionInfo()
+    }
+  }, [acceleratorDiagnostics, loadAcceleratorDiagnostics, loadNamVersionInfo, loadSettings, namVersionInfo, settings, validation, validateBackend])
 
   const handleRecheck = async () => {
     await Promise.all([validateBackend(), loadAcceleratorDiagnostics()])
@@ -1011,6 +1086,183 @@ export default function Diagnostics() {
         ) : (
           <div style={{ textAlign: 'center', padding: '32px' }}>
             <p style={{ color: 'var(--text-steel)' }}>No accelerator diagnostics yet.</p>
+          </div>
+        )}
+      </div>
+
+      {!validation?.overallOk && (
+        <div className="panel">
+          <div className="panel-header">
+            <h3>Next Steps</h3>
+          </div>
+          <ol style={{ color: 'var(--text-steel)', paddingLeft: '20px', lineHeight: '1.8' }}>
+            <li>Go to Settings and configure your Conda executable path</li>
+            <li>Use <strong>conda</strong> on PATH or set a full Conda path in Settings</li>
+            <li>Set your Conda environment name or prefix. The default environment name is <strong>nam</strong></li>
+            <li>Click "Re-check" to verify everything is working</li>
+          </ol>
+        </div>
+      )}
+
+      <div className="panel" style={{ marginBottom: '16px' }}>
+        <div className="panel-header">
+          <h3>NAM Version Check</h3>
+        </div>
+
+        {namVersionInfo ? (
+          <>
+            <div
+              style={{
+                padding: '20px',
+                marginBottom: '20px',
+                border: `2px solid ${
+                  namVersionInfo.checkStatus === 'ok' && namVersionInfo.isUpToDate
+                    ? 'var(--neon-green)'
+                    : namVersionInfo.checkStatus === 'ok' && namVersionInfo.isUpToDate === false
+                    ? 'var(--neon-cyan)'
+                    : 'var(--border-dim)'
+                }`,
+                backgroundColor: 'var(--bg-void)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <span
+                  style={{
+                    color: getVersionStatusBadge(namVersionInfo).color,
+                    fontSize: '28px',
+                    fontFamily: 'var(--font-arcade)'
+                  }}
+                >
+                  {getVersionStatusBadge(namVersionInfo).icon} {getVersionStatusBadge(namVersionInfo).label}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <p style={{ color: 'var(--text-steel)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Installed Version
+                  </p>
+                  <p style={{ color: 'var(--text-ash)', fontSize: '16px', fontFamily: 'Consolas, Monaco, monospace' }}>
+                    {namVersionInfo.installedVersion ?? 'Not detected'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--text-steel)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Latest Version
+                  </p>
+                  <p style={{ color: 'var(--text-ash)', fontSize: '16px', fontFamily: 'Consolas, Monaco, monospace' }}>
+                    {namVersionInfo.latestVersion ?? 'Unable to check'}
+                  </p>
+                </div>
+              </div>
+
+              {namVersionInfo.isUpToDate === false && namVersionInfo.latestReleaseUrl && (
+                <div style={{ marginBottom: '16px' }}>
+                  <p style={{ color: 'var(--neon-cyan)', fontSize: '13px', marginBottom: '8px' }}>
+                    → A newer version is available. Upgrading is recommended to access the latest features, bug fixes, and training improvements.
+                  </p>
+                  {namVersionInfo.publishedAt && (
+                    <p style={{ color: 'var(--text-steel)', fontSize: '12px' }}>
+                      Latest release published: {new Date(namVersionInfo.publishedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {namVersionInfo.checkStatus !== 'ok' && namVersionInfo.errorMessage && (
+                <div style={{ marginBottom: '16px' }}>
+                  <p style={{ color: 'var(--neon-magenta)', fontSize: '13px', marginBottom: '8px' }}>
+                    → {namVersionInfo.errorMessage}
+                  </p>
+                  {namVersionInfo.checkStatus === 'offline' && (
+                    <p style={{ color: 'var(--text-steel)', fontSize: '12px' }}>
+                      Check your internet connection and try again.
+                    </p>
+                  )}
+                  {namVersionInfo.checkStatus === 'rate_limited' && (
+                    <p style={{ color: 'var(--text-steel)', fontSize: '12px' }}>
+                      GitHub API rate limit exceeded. Please try again later.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {namVersionInfo.isUpToDate === false && (
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    className={`btn ${showUpgradeSteps ? 'btn-blue is-toggled' : 'btn-secondary'}`}
+                    onClick={() => setShowUpgradeSteps(!showUpgradeSteps)}
+                  >
+                    {showUpgradeSteps ? 'Hide Upgrade Steps' : 'View Upgrade Steps'}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      const commands = getUpgradeCommands(settings)
+                      const upgradeCommand = commands.find((cmd) => cmd.label === 'Upgrade NAM')
+                      if (upgradeCommand) {
+                        copyText(upgradeCommand.command)
+                      }
+                    }}
+                  >
+                    Copy Upgrade Command
+                  </button>
+                  {namVersionInfo.latestReleaseUrl && (
+                    <a
+                      href={namVersionInfo.latestReleaseUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      View Release Notes
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {showUpgradeSteps && namVersionInfo.isUpToDate === false && (
+              <div
+                style={{
+                  border: '1px solid var(--border-dim)',
+                  backgroundColor: 'rgba(9, 9, 11, 0.45)',
+                  padding: '14px',
+                  marginBottom: '16px'
+                }}
+              >
+                <p
+                  style={{
+                    color: 'var(--text-ash)',
+                    fontFamily: 'var(--font-arcade)',
+                    fontSize: '18px',
+                    marginBottom: '12px'
+                  }}
+                >
+                  Manual Upgrade Steps
+                </p>
+                <p
+                  style={{
+                    color: 'var(--text-steel)',
+                    fontSize: '13px',
+                    lineHeight: '1.6',
+                    marginBottom: '16px'
+                  }}
+                >
+                  Run these commands in your terminal to upgrade NAM to the latest version:
+                </p>
+                {getUpgradeCommands(settings).map((step) => (
+                  <CopyableCodeBlock key={step.label} label={step.label} command={step.command} />
+                ))}
+                <p style={{ color: 'var(--neon-cyan)', fontSize: '13px', lineHeight: '1.5' }}>
+                  → After upgrading, return to this screen and click "Re-check" to verify the new version.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '32px' }}>
+            <p style={{ color: 'var(--text-steel)' }}>Loading version information...</p>
           </div>
         )}
       </div>
