@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-03-28
+
+### Added
+
+- Focused Vitest regression coverage for preset normalization and generated `model.json` output so legacy custom architectures stay pinned to their intended network config
+
+### Changed
+
+- Preset docs now explicitly describe automatic compatibility handling for older NAM-BOT custom-architecture exports
+
+### Fixed
+
+- Queued jobs now wait for their own fresh timestamped output folder before mirroring the training `.log`, preventing ESR tracking and final `.nam` metadata work from binding to the previous run's folder
+- Legacy NAM-BOT custom presets from older releases now normalize raw `expert.model` architecture snippets into the canonical `net.config` shape so existing presets generate the correct custom `.nam` architecture instead of the standard WaveNet default
+
 ## [0.4.2] - 2026-03-23
 
 ### Added

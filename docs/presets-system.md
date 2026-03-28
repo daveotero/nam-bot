@@ -201,6 +201,11 @@ Expert overrides are optional JSON blocks merged on top of the generated base co
 - `Model JSON` merges on top of generated `model.json`
 - `Learning JSON` merges on top of generated `learning.json`
 
+For backward compatibility, NAM-BOT also accepts older custom-architecture preset exports where
+`expert.model` is a raw WaveNet or LSTM config snippet instead of a full `model.json` override.
+Those legacy shapes are normalized internally so existing shared presets from older NAM-BOT
+versions continue to generate the intended `net.config`.
+
 If an expert block overrides one of the friendly manual fields:
 
 - that friendly field becomes read-only
@@ -269,6 +274,8 @@ Backward compatibility is handled through schema normalization.
 - All preset reads pass through `normalizeTrainingPreset()`.
 - Missing fields are backfilled with defaults.
 - Optional sharing metadata can be absent in older files without causing failures.
+- Legacy custom-architecture presets from older NAM-BOT releases are upgraded from flat
+  `expert.model` config snippets to the canonical `expert.model.net.config` shape during load.
 - New fields should be added in a backward-compatible way whenever possible.
 
 When the schema eventually changes:

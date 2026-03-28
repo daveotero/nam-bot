@@ -1,11 +1,12 @@
 {
   "name": "nam-bot",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Neural Amp Modeler Training Manager",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "test": "vitest run",
     "preview": "electron-vite preview",
     "package": "npm run build && electron-builder --win --config electron-builder.yml",
     "package:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
@@ -44,7 +45,8 @@
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",

@@ -263,6 +263,57 @@ function asOptionalTrimmedString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return cloneJson(value)
+}
+
+function isLegacyWaveNetConfig(value: Record<string, unknown>): boolean {
+  return Array.isArray(value.layers_configs)
+}
+
+function isLegacyLstmConfig(value: Record<string, unknown>): boolean {
+  return typeof value.num_layers === 'number' && typeof value.hidden_size === 'number'
+}
+
+function isCanonicalModelOverride(value: Record<string, unknown>): boolean {
+  return isRecord(value.net)
+    || isRecord(value.loss)
+    || isRecord(value.optimizer)
+    || isRecord(value.lr_scheduler)
+}
+
+function normalizeExpertModelShape(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  if (isCanonicalModelOverride(value)) {
+    return cloneRecord(value)
+  }
+
+  const rawConfig = cloneRecord(value)
+
+  if (isLegacyWaveNetConfig(rawConfig)) {
+    return {
+      net: {
+        name: 'WaveNet',
+        config: rawConfig
+      }
+    }
+  }
+
+  if (isLegacyLstmConfig(rawConfig)) {
+    return {
+      net: {
+        name: 'LSTM',
+        config: rawConfig
+      }
+    }
+  }
+
+  return cloneRecord(value)
+}
+
 function normalizeTrainingPresetAuthor(value: unknown): TrainingPresetAuthor | undefined {
   if (!isRecord(value)) {
     return undefined
@@ -521,14 +572,6 @@ export function normalizeTrainingPreset(value: unknown): TrainingPresetFile {
   }
 
   const partial = value as Record<string, unknown>
-  const expert: TrainingPresetExpertBlocks = {
-    data: isRecord(partial.expert) && isRecord(partial.expert.data) ? partial.expert.data : undefined,
-    model: isRecord(partial.expert) && isRecord(partial.expert.model) ? partial.expert.model : undefined,
-    learning: isRecord(partial.expert) && isRecord(partial.expert.learning) ? partial.expert.learning : undefined
-  }
-  const author = normalizeTrainingPresetAuthor(partial.author)
-  const origin = normalizeTrainingPresetOrigin(partial.origin)
-
   const rawValues = isRecord(partial.values) ? partial.values : {}
   const values: TrainingPresetValues = {
     modelFamily: rawValues.modelFamily === 'LSTM' ? 'LSTM' : 'WaveNet',
@@ -546,6 +589,14 @@ export function normalizeTrainingPreset(value: unknown): TrainingPresetFile {
     ny: asPositiveInt(rawValues.ny, DEFAULT_TRAINING_PRESET_VALUES.ny),
     fitMrstft: asBoolean(rawValues.fitMrstft, DEFAULT_TRAINING_PRESET_VALUES.fitMrstft)
   }
+  const rawExpert = isRecord(partial.expert) ? partial.expert : {}
+  const expert: TrainingPresetExpertBlocks = {
+    data: isRecord(rawExpert.data) ? cloneRecord(rawExpert.data) : undefined,
+    model: normalizeExpertModelShape(rawExpert.model),
+    learning: isRecord(rawExpert.learning) ? cloneRecord(rawExpert.learning) : undefined
+  }
+  const author = normalizeTrainingPresetAuthor(partial.author)
+  const origin = normalizeTrainingPresetOrigin(partial.origin)
 
   return createTrainingPreset({
     id: asString(partial.id, slugifyPresetName(asString(partial.name, 'custom-preset'))),
