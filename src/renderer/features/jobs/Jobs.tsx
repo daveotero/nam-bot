@@ -47,7 +47,8 @@ import {
   filenameWithoutExt,
   getBasename,
   getDirname,
-  getDisplayState
+  getDisplayState,
+  getPlannedEpochsLabel
 } from './job-helpers'
 import RuntimeCard, { renderDisplayBadge } from './RuntimeCard'
 import { handleCardToggleKeyDown, shouldIgnoreCardToggle } from '../../utils/card-toggle'
@@ -180,6 +181,9 @@ interface SortableQueueItemProps {
 
 function SortableQueueItem({ runtime, queue, presets, index, onUnqueue }: SortableQueueItemProps) {
   const presetName = presets.find(p => p.id === runtime.frozenJob.presetId)?.name || runtime.frozenJob.presetId || 'Unknown'
+  const headline = runtime.status === 'validating'
+    ? 'Validating job before queue'
+    : `Waiting in queue - ${index + 1} of ${queue.length}`
   const {
     attributes,
     listeners,
@@ -212,9 +216,16 @@ function SortableQueueItem({ runtime, queue, presets, index, onUnqueue }: Sortab
           <div className="queue-card-status-row">
             {renderDisplayBadge('Queued')}
             <div className="queue-card-headline-group">
-              <p className="queue-card-headline">Waiting in queue - {index + 1} of {queue.length}</p>
-              <div className="job-meta-preset">
-                <span className="meta-label">Preset:</span> {presetName}
+              <p className="queue-card-headline">{headline}</p>
+              <div className="queue-card-stat-row">
+                <span className="queue-card-stat">
+                  <span className="meta-label">Preset</span>
+                  <span>{presetName}</span>
+                </span>
+                <span className="queue-card-stat">
+                  <span className="meta-label">Epochs</span>
+                  <span>{getPlannedEpochsLabel(runtime)}</span>
+                </span>
               </div>
             </div>
           </div>
@@ -712,7 +723,6 @@ export default function Jobs() {
                     <RuntimeCard
                       key={runtime.jobId}
                       runtime={runtime}
-                      queue={queue}
                       presets={presets}
                       nowMs={nowMs}
                       isExpanded={expandedJobs[runtime.jobId] === true}

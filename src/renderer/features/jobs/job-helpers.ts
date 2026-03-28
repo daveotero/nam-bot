@@ -207,19 +207,176 @@ export function getProgressMeta(runtime: JobRuntimeState, nowMs: number): string
   return parts.length > 0 ? parts.join(' - ') : null
 }
 
-export function getStatusSentence(runtime: JobRuntimeState): string {
-  const displayState = getDisplayState(runtime)
+export function getElapsedLabel(runtime: JobRuntimeState, nowMs: number): string | null {
+  const elapsedRunSeconds = getElapsedRunSeconds(runtime, nowMs)
+  if (elapsedRunSeconds != null) {
+    return formatDuration(elapsedRunSeconds)
+  }
+  return runtime.terminalProgress?.elapsed || null
+}
 
-  if (displayState === 'Queued') {
+export function getRemainingLabel(runtime: JobRuntimeState, nowMs: number): string | null {
+  const remainingRunSeconds = getRemainingRunSeconds(runtime, nowMs)
+  if (remainingRunSeconds != null) {
+    return formatDuration(remainingRunSeconds)
+  }
+  return runtime.terminalProgress?.remaining || null
+}
+
+export function getTotalRuntimeLabel(runtime: JobRuntimeState): string | null {
+  const startedAtMs = runtime.startedAt ? Date.parse(runtime.startedAt) : Number.NaN
+  const finishedAtMs = runtime.finishedAt ? Date.parse(runtime.finishedAt) : Number.NaN
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(finishedAtMs) || finishedAtMs < startedAtMs) {
+    return null
+  }
+
+  const totalSeconds = Math.max(0, Math.floor((finishedAtMs - startedAtMs) / 1000))
+  return formatDuration(totalSeconds)
+}
+
+export function getPlannedEpochsLabel(runtime: JobRuntimeState): string {
+  const plannedEpochs = runtime.plannedEpochs ?? runtime.frozenJob.trainingOverrides.epochs ?? null
+  if (plannedEpochs == null || !Number.isFinite(plannedEpochs) || plannedEpochs <= 0) {
+    return 'Unknown'
+  }
+  return String(plannedEpochs)
+}
+
+export function getStopModeLabel(runtime: JobRuntimeState): string {
+  if (runtime.stopMode === 'force') {
+    return 'Force'
+  }
+  if (runtime.stopMode === 'graceful') {
+    return 'Graceful'
+  }
+  return 'Requested'
+}
+
+function abbreviate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value
+  }
+  return `${value.slice(0, maxLength - 1)}...`
+}
+
+export function getFailureReason(runtime: JobRuntimeState): string {
+  const userMessage = getLatestUserMessage(runtime)
+  if (userMessage) {
+    const compact = userMessage
+      .replace(/Recent terminal output:.*/i, '')
+      .replace(/Training process error:\s*/i, '')
+      .trim()
+    if (compact) {
+      return abbreviate(compact, 88)
+    }
+  }
+
+  if (runtime.exitCode != null) {
+    return `Exit code ${runtime.exitCode}`
+  }
+
+  return 'Training error'
+}
+
+export interface CollapsedSummaryItem {
+  label: string
+  value: string
+  tone?: 'default' | 'error'
+}
+
+export function getCollapsedSummaryItems(
+  runtime: JobRuntimeState,
+  presetName: string,
+  nowMs: number
+): CollapsedSummaryItem[] {
+  const progressStat = getTrainingSecondaryStat(runtime)
+  const bestEsr = runtime.checkpointSummary?.bestValidationEsr
+  const totalRuntime = getTotalRuntimeLabel(runtime) || getElapsedLabel(runtime, nowMs)
+  const elapsed = getElapsedLabel(runtime, nowMs)
+  const remaining = getRemainingLabel(runtime, nowMs)
+  const epochs = getPlannedEpochsLabel(runtime)
+
+  switch (runtime.status) {
+    case 'queued':
+      return [
+        { label: 'Preset', value: presetName },
+        { label: 'Epochs', value: epochs }
+      ]
+    case 'validating':
+      return [
+        { label: 'Preset', value: presetName },
+        { label: 'Epochs', value: epochs }
+      ]
+    case 'preparing':
+      return [
+        { label: 'Preset', value: presetName },
+        { label: 'Device', value: getDetailedDeviceLabel(runtime) },
+        { label: 'Epochs', value: epochs }
+      ]
+    case 'running':
+      return [
+        { label: progressStat.label, value: progressStat.value },
+        { label: 'Elapsed', value: elapsed || 'Calculating...' },
+        { label: 'Remaining', value: remaining || 'Estimating...' }
+      ]
+    case 'stopping':
+      return [
+        { label: progressStat.label, value: progressStat.value },
+        { label: 'Elapsed', value: elapsed || 'Calculating...' },
+        { label: 'Stopped', value: getStopModeLabel(runtime) }
+      ]
+    case 'succeeded':
+      return [
+        { label: 'Preset', value: presetName },
+        { label: 'Total Runtime', value: totalRuntime || 'Not yet available' },
+        { label: 'Final ESR', value: formatEsr(bestEsr) }
+      ]
+    case 'failed': {
+      const items: CollapsedSummaryItem[] = []
+      if (totalRuntime) {
+        items.push({ label: 'Total Runtime', value: totalRuntime })
+      }
+      items.push({ label: 'Failure', value: getFailureReason(runtime), tone: 'error' })
+      if (bestEsr != null) {
+        items.push({ label: 'Best ESR', value: formatEsr(bestEsr) })
+      }
+      return items
+    }
+    case 'canceled': {
+      const items: CollapsedSummaryItem[] = []
+      if (totalRuntime) {
+        items.push({ label: 'Total Runtime', value: totalRuntime })
+      }
+      items.push({ label: 'Stopped', value: getStopModeLabel(runtime) })
+      if (bestEsr != null) {
+        items.push({ label: 'Best ESR', value: formatEsr(bestEsr) })
+      }
+      return items
+    }
+    default:
+      return []
+  }
+}
+
+export function getStatusSentence(runtime: JobRuntimeState): string {
+  if (runtime.status === 'queued') {
     return 'Waiting in queue'
   }
 
-  if (displayState === 'Running') {
+  if (runtime.status === 'validating') {
+    return 'Validating job before queue'
+  }
+
+  if (runtime.status === 'preparing' || runtime.status === 'running' || runtime.status === 'stopping') {
     return getProgressHeadline(runtime)
   }
 
-  if (displayState === 'Successful') {
+  if (runtime.status === 'succeeded') {
     return 'Training complete'
+  }
+
+  if (runtime.status === 'canceled') {
+    return 'Training stopped by user'
   }
 
   return getLatestUserMessage(runtime)

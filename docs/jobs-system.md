@@ -148,6 +148,12 @@ Active and finished jobs appear in the training section.
 - terminal logs can be expanded and refreshed while a job is active
 - `Clear Finished` removes finished runtime entries from the queue history panel
 - while a run is active, elapsed time is measured from the start of the training run and remaining time is estimated against the full planned epoch count rather than the current epoch only
+- collapsed cards now show status-specific quick stats:
+  - queued and validating cards show preset and planned epochs
+  - preparing cards show preset, detected device summary, and planned epochs
+  - running and stopping cards show progress/ESR plus elapsed and remaining or stop mode details
+  - successful cards show preset, total runtime, and final ESR
+  - failed and canceled cards prioritize total runtime and failure or stop reason, with ESR when available
 
 ## Job Schema
 

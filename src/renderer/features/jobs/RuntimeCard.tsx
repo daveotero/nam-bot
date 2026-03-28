@@ -6,12 +6,10 @@ import { handleCardToggleKeyDown, shouldIgnoreCardToggle } from '../../utils/car
 import {
   getDisplayState,
   getStatusSentence,
-  getQueueSecondaryStat,
-  getTrainingSecondaryStat,
   getStopActionState,
   getProgressPercent,
-  getProgressMeta,
-  getExpandedDetails,
+  getCollapsedSummaryItems,
+  getPlannedEpochsLabel,
   getDetailedDeviceLabel,
   getLatestTerminalLine,
   isActiveRuntime,
@@ -22,7 +20,6 @@ import {
 
 interface RuntimeCardProps {
   runtime: JobRuntimeState
-  queue: JobRuntimeState[]
   presets: TrainingPresetFile[]
   nowMs: number
   isExpanded: boolean
@@ -49,7 +46,6 @@ export function renderDisplayBadge(displayState: QueueDisplayState) {
 
 export default function RuntimeCard({
   runtime,
-  queue,
   presets,
   nowMs,
   isExpanded,
@@ -67,14 +63,12 @@ export default function RuntimeCard({
 }: RuntimeCardProps) {
   const displayState = getDisplayState(runtime)
   const statusSentence = getStatusSentence(runtime)
-  const secondaryStat = displayState === 'Queued'
-    ? getQueueSecondaryStat(runtime, queue)
-    : getTrainingSecondaryStat(runtime)
   const stopAction = getStopActionState(runtime, nowMs)
-  const progressPercent = displayState === 'Running' || displayState === 'Successful' ? getProgressPercent(runtime) : null
-  const progressMeta = displayState === 'Running' ? getProgressMeta(runtime, nowMs) : null
+  const progressPercent = runtime.status === 'running' || runtime.status === 'stopping' ? getProgressPercent(runtime) : null
   const hasTerminalToggle = displayState !== 'Queued'
   const outputPath = getOutputPath(runtime)
+  const presetName = presets.find((preset) => preset.id === runtime.frozenJob.presetId)?.name || runtime.frozenJob.presetId || 'Unknown'
+  const collapsedSummaryItems = getCollapsedSummaryItems(runtime, presetName, nowMs)
 
   return (
     <div
@@ -103,14 +97,24 @@ export default function RuntimeCard({
             </p>
           </div>
 
-          {displayState === 'Running' && progressPercent != null && (
+          {collapsedSummaryItems.length > 0 && (
+            <div className="queue-card-stat-row">
+              {collapsedSummaryItems.map((item) => (
+                <span key={`${runtime.jobId}-${item.label}`} className={`queue-card-stat${item.tone === 'error' ? ' queue-card-stat-error' : ''}`}>
+                  <span className="meta-label">{item.label}</span>
+                  <span>{item.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {(runtime.status === 'running' || runtime.status === 'stopping') && progressPercent != null && (
             <div className="training-progress-group">
               <div className="training-progress-bar" aria-hidden="true">
                 <span style={{ width: `${progressPercent}%` }} />
               </div>
               <div className="training-progress-meta">
-                <span>{secondaryStat.value}</span>
-                {progressMeta && <span>{progressMeta}</span>}
+                <span>{`${Math.round(progressPercent)}% complete`}</span>
               </div>
             </div>
           )}
@@ -180,7 +184,11 @@ export default function RuntimeCard({
           <div className="queue-details-grid">
             <div className="queue-detail-stat">
               <span className="stat-label">Preset</span>
-              <span className="stat-value">{presets.find(p => p.id === runtime.frozenJob.presetId)?.name || runtime.frozenJob.presetId || 'Unknown'}</span>
+              <span className="stat-value">{presetName}</span>
+            </div>
+            <div className="queue-detail-stat">
+              <span className="stat-label">Epochs</span>
+              <span className="stat-value">{getPlannedEpochsLabel(runtime)}</span>
             </div>
             {(displayState === 'Running' || displayState === 'Successful') && (
               <>

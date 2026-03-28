@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Jobs screen collapsed runtime cards now use a status-specific summary layout so each state surfaces the most useful details at a glance (preset and epochs for queued/validating, live timing and progress for active runs, runtime plus outcome context for finished runs)
+- Completed collapsed cards now show `Preset`, `Total Runtime`, and `Final ESR` without requiring expansion
+- Failed and canceled collapsed cards now prioritize total runtime and stop/failure context, and show ESR only when checkpoint data exists
+- Queue cards now include planned epochs in the default collapsed row for both queued and validating items
+- Jobs system documentation now includes the new collapsed-card quick-stat behavior matrix
+
 ## [0.4.3] - 2026-03-28
 
 ### Added

@@ -844,6 +844,26 @@ input[type="number"] {
   min-width: 0;
 }
 
+.queue-card-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 8px;
+}
+
+.queue-card-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-ash);
+  font-size: 13px;
+}
+
+.queue-card-stat-error {
+  color: var(--neon-magenta);
+}
+
 .queue-card-headline-group {
   display: flex;
   flex-direction: column;
@@ -1077,6 +1097,10 @@ input[type="number"] {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+
+  .queue-card-stat-row {
+    gap: 8px 12px;
   }
 }
 

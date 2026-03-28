@@ -241,11 +241,10 @@ function Dashboard() {
           <div className="job-list" style={{ marginTop: '12px' }}>
              {trainingJobs.map(job => (
                <RuntimeCard
-                 key={job.jobId}
-                 runtime={job}
-                 queue={queue}
-                 presets={presets}
-                 nowMs={nowMs}
+                  key={job.jobId}
+                  runtime={job}
+                  presets={presets}
+                  nowMs={nowMs}
                  isExpanded={expandedJobIds.has(job.jobId)}
                  isLogsVisible={visibleLogJobIds.has(job.jobId)}
                  terminalLog={logContents[job.jobId] || ''}
