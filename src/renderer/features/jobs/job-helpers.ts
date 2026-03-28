@@ -188,45 +188,37 @@ function getRemainingRunSeconds(runtime: JobRuntimeState, nowMs: number): number
   return Math.max(0, Math.round(estimatedTotalSeconds - elapsedSeconds))
 }
 
-export function getProgressMeta(runtime: JobRuntimeState, nowMs: number): string | null {
-  const elapsedRunSeconds = getElapsedRunSeconds(runtime, nowMs)
-  const remainingRunSeconds = getRemainingRunSeconds(runtime, nowMs)
-  const parts = [
-    runtime.terminalProgress?.elapsed
-      ? `Elapsed ${runtime.terminalProgress.elapsed}`
-      : elapsedRunSeconds != null
-        ? `Elapsed ${formatDuration(elapsedRunSeconds)}`
-        : null,
-    runtime.terminalProgress?.remaining
-      ? `Remaining ${runtime.terminalProgress.remaining}`
-      : remainingRunSeconds != null
-        ? `Remaining ${formatDuration(remainingRunSeconds)}`
-        : null,
-    runtime.terminalProgress?.rate || null
-  ].filter((entry): entry is string => Boolean(entry))
-  return parts.length > 0 ? parts.join(' - ') : null
-}
-
 export function getElapsedLabel(runtime: JobRuntimeState, nowMs: number): string | null {
-  if (runtime.terminalProgress?.elapsed) {
-    return runtime.terminalProgress.elapsed
-  }
   const elapsedRunSeconds = getElapsedRunSeconds(runtime, nowMs)
   if (elapsedRunSeconds != null) {
     return formatDuration(elapsedRunSeconds)
   }
-  return null
+  return runtime.terminalProgress?.elapsed || null
 }
 
 export function getRemainingLabel(runtime: JobRuntimeState, nowMs: number): string | null {
-  if (runtime.terminalProgress?.remaining) {
-    return runtime.terminalProgress.remaining
-  }
   const remainingRunSeconds = getRemainingRunSeconds(runtime, nowMs)
   if (remainingRunSeconds != null) {
     return formatDuration(remainingRunSeconds)
   }
   return null
+}
+
+export function getProgressMeta(runtime: JobRuntimeState, nowMs: number): string | null {
+  const elapsedRunSeconds = getElapsedRunSeconds(runtime, nowMs)
+  const remainingRunSeconds = getRemainingRunSeconds(runtime, nowMs)
+  const parts = [
+    elapsedRunSeconds != null
+      ? `Elapsed ${formatDuration(elapsedRunSeconds)}`
+      : runtime.terminalProgress?.elapsed
+        ? `Elapsed ${runtime.terminalProgress.elapsed}`
+        : null,
+    remainingRunSeconds != null
+      ? `Remaining ${formatDuration(remainingRunSeconds)}`
+      : null,
+    runtime.terminalProgress?.rate || null
+  ].filter((entry): entry is string => Boolean(entry))
+  return parts.length > 0 ? parts.join(' - ') : null
 }
 
 export function getTotalRuntimeLabel(runtime: JobRuntimeState): string | null {
