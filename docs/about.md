@@ -21,6 +21,13 @@ The About screen doubles as NAM-BOT's in-app credits and lightweight update surf
   - `Download latest` opens the newest GitHub release page in the default browser.
   - `View changelog` opens that release's notes page in the default browser.
 
+## Terminal Diagnostics
+
+- The About terminal includes a few undocumented responses for curious operators who try commands outside the visible menu.
+- Some hidden diagnostics use short CRT-style loading sequences and should preserve the same terminal aesthetic as the rest of the screen.
+- Any tucked-away NAM-BOT recovery protocol should keep input forgiving, avoid accidental prompt skips, and return cleanly to the normal About terminal.
+- If a hidden terminal path grants a reward preset, the final action should still use the existing preset-library flow and report clearly when that preset is already available in Jobs.
+
 ## Development And Packaging
 
 - `npm run dev`: starts the Electron app in development mode with hot reload so you can verify the About screen and update badge live.

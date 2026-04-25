@@ -152,9 +152,11 @@ function createBootSequence(updateStatus: UpdateStatus): BootSequenceItem[] {
 
 const epochRunnerLoaderLines = [
   'Launching EPOCHRUNNER.EXE',
+  'Staging five training runs',
   'Allocating waveform terrain',
   'Calibrating jump physics',
-  'Indexing collectible epochs',
+  'Loading NAM-BOT recovery buffer',
+  'Indexing +1 and +5 epoch packets',
   'Loading reward preset manifest',
   'Ready. Press SPACE.'
 ]
