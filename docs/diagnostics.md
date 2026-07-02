@@ -118,6 +118,7 @@ Training launch diagnostics check:
 - NAM-BOT can create and write a temporary training workspace
 - a PTY can launch Python through `conda run --no-capture-output`
 - a PTY can launch `nam-full --help` through the same path
+- on macOS, the packaged `node-pty` helper exists and has executable permissions
 - macOS app location warnings such as running from a DMG or app translocation
 - fragile Conda settings such as relying on bare `conda` instead of a full executable path
 
@@ -219,6 +220,7 @@ The current guided paths cover cases such as:
 - torch and Lightning disagreeing about CUDA
 - probe execution failures
 - PTY launch failures such as `posix_spawnp failed`
+- missing or non-executable packaged `node-pty` helpers on macOS
 - NAM-BOT running from fragile macOS app locations such as a DMG or app translocation path
 - workspace folder creation/write failures
 - Conda configured as a bare command when a full executable path would be more reliable
@@ -298,6 +300,7 @@ Start with the accelerator panel.
 Start with the Training Launch rows.
 
 - if `PTY Python launch` fails, the environment may be valid but the operating system or app runtime cannot start the training terminal process
+- on macOS, check the reported `node-pty helper` facts in Advanced Details or the raw diagnostics export to confirm the packaged helper exists and is executable
 - if Conda is configured as `conda`, use the full Conda executable path from `which conda` on macOS/Linux or `where conda` on Windows
 - on macOS, move NAM-BOT into `/Applications`, right-click it, choose Open, and re-run Diagnostics
 - make sure the app build matches the CPU architecture, especially Apple Silicon `arm64`

@@ -36,18 +36,30 @@ Required for all Electron apps on macOS with hardened runtime. Grants:
 - Unsigned executable memory (required by V8)
 - Library validation disabled (required for `node-pty` native addon)
 
-### 4. `src/main/types/index.ts` — Platform-aware Conda default
+### 4. `node-pty` packaging guard
+Training uses `node-pty` so NAM-BOT can stream terminal-style output from the NAM trainer. On macOS, `node-pty` relies on a bundled native `spawn-helper` executable.
+
+The macOS builder now:
+
+- unpacks `node_modules/node-pty/**/*` outside `app.asar`
+- runs `build/after-pack.cjs` after packaging to find every bundled `spawn-helper`
+- restores executable permissions with `chmod 755` when needed
+- fails the macOS release or preview workflow if the helper is missing or still not executable
+
+This protects packaged DMGs from `posix_spawnp failed` startup failures where backend validation passes but the PTY training terminal cannot start.
+
+### 5. `src/main/types/index.ts` — Platform-aware Conda default
 Original default was `'conda.exe'` (Windows-only path). Changed to:
 ```typescript
 condaExecutablePath: process.platform === 'win32' ? 'conda.exe' : 'conda'
 ```
 Without this fix, the app silently fails to find Conda on macOS.
 
-### 5. `package.json` — Build scripts
+### 6. `package.json` — Build scripts
 Added:
 ```json
-"package:mac": "electron-vite build && electron-builder --mac --config electron-builder.yml",
-"package:win": "electron-vite build && electron-builder --win --config electron-builder.yml"
+"package:mac": "npm run build && electron-builder --mac --config electron-builder.yml && node build/verify-macos-node-pty.cjs release",
+"package:win": "npm run build && electron-builder --win --config electron-builder.yml"
 ```
 
 ## Building for macOS

@@ -1,4 +1,4 @@
-# AGENTS.md - NAM-BOT Development Guide (v0.6.1)
+# AGENTS.md - NAM-BOT Development Guide (v0.6.2)
 
 This document provides guidance for AI agents working on the NAM-BOT project.
 

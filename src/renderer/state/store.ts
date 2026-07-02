@@ -200,6 +200,11 @@ export interface TrainingLaunchDiagnosticsSummary {
   workspacePath: string | null
   appExecutablePath: string | null
   processArch: string
+  nodePtyHelperPath: string | null
+  nodePtyHelperExists: boolean | null
+  nodePtyHelperExecutable: boolean | null
+  nodePtyHelperMode: string | null
+  nodePtyHelperError: string | null
   checks: TrainingLaunchCheckResult[]
   errors: string[]
 }

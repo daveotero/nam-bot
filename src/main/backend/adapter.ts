@@ -1,8 +1,9 @@
 import { ChildProcess, execFileSync, execFile, spawn, SpawnOptionsWithoutStdio } from 'child_process'
 import https from 'https'
+import { createRequire } from 'module'
 import { app } from 'electron'
 import log from 'electron-log/main'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { spawn as spawnPty, IPty } from 'node-pty'
 import { tmpdir } from 'os'
 import { join, dirname } from 'path'
@@ -81,6 +82,15 @@ const TRAINING_LAUNCH_TIMEOUT_MS = 30_000
 const LIGHTNING_SECURITY_RECENT_RESULT_TTL_MS = 5_000
 const lightningSecurityInFlight = new Map<string, Promise<LightningSecuritySummary>>()
 const lightningSecurityRecentResults = new Map<string, { checkedAt: number; summary: LightningSecuritySummary }>()
+const mainRequire = createRequire(import.meta.url)
+
+interface NodePtyHelperDiagnostics {
+  nodePtyHelperPath: string | null
+  nodePtyHelperExists: boolean | null
+  nodePtyHelperExecutable: boolean | null
+  nodePtyHelperMode: string | null
+  nodePtyHelperError: string | null
+}
 
 interface PtyCommandResult {
   ok: boolean
@@ -209,6 +219,8 @@ function createTrainingLaunchDiagnosticsSummary(
   detail: string,
   extras?: Partial<Omit<TrainingLaunchDiagnosticsSummary, 'checkedAt' | 'status' | 'issue' | 'headline' | 'detail'>>
 ): TrainingLaunchDiagnosticsSummary {
+  const nodePtyHelperDiagnostics = inspectNodePtySpawnHelper()
+
   return {
     checkedAt: new Date().toISOString(),
     status,
@@ -220,6 +232,11 @@ function createTrainingLaunchDiagnosticsSummary(
     workspacePath: extras?.workspacePath ?? null,
     appExecutablePath: extras?.appExecutablePath ?? process.execPath,
     processArch: extras?.processArch ?? process.arch,
+    nodePtyHelperPath: extras?.nodePtyHelperPath ?? nodePtyHelperDiagnostics.nodePtyHelperPath,
+    nodePtyHelperExists: extras?.nodePtyHelperExists ?? nodePtyHelperDiagnostics.nodePtyHelperExists,
+    nodePtyHelperExecutable: extras?.nodePtyHelperExecutable ?? nodePtyHelperDiagnostics.nodePtyHelperExecutable,
+    nodePtyHelperMode: extras?.nodePtyHelperMode ?? nodePtyHelperDiagnostics.nodePtyHelperMode,
+    nodePtyHelperError: extras?.nodePtyHelperError ?? nodePtyHelperDiagnostics.nodePtyHelperError,
     checks: extras?.checks ?? [],
     errors: extras?.errors ?? []
   }
@@ -314,6 +331,81 @@ export function parseNamLatencyAnalysisOutput(output: string): NamLatencyAnalysi
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return createFailedLatencyAnalysis(output, `Failed to parse NAM latency analyzer result: ${message}`)
+  }
+}
+
+function formatFileMode(mode: number): string {
+  return `0${(mode & 0o777).toString(8)}`
+}
+
+function createEmptyNodePtyHelperDiagnostics(): NodePtyHelperDiagnostics {
+  return {
+    nodePtyHelperPath: null,
+    nodePtyHelperExists: null,
+    nodePtyHelperExecutable: null,
+    nodePtyHelperMode: null,
+    nodePtyHelperError: null
+  }
+}
+
+function toAsarUnpackedPath(value: string): string {
+  let nextValue = value
+  if (!nextValue.includes('app.asar.unpacked')) {
+    nextValue = nextValue.replace('app.asar', 'app.asar.unpacked')
+  }
+  if (!nextValue.includes('node_modules.asar.unpacked')) {
+    nextValue = nextValue.replace('node_modules.asar', 'node_modules.asar.unpacked')
+  }
+  return nextValue
+}
+
+function inspectNodePtySpawnHelper(): NodePtyHelperDiagnostics {
+  if (process.platform !== 'darwin') {
+    return createEmptyNodePtyHelperDiagnostics()
+  }
+
+  try {
+    const packagePath = mainRequire.resolve('node-pty/package.json')
+    const packageRoot = dirname(packagePath)
+    const unpackedPackageRoot = toAsarUnpackedPath(packageRoot)
+    const roots = Array.from(new Set([packageRoot, unpackedPackageRoot]))
+    const candidateRelativePaths = [
+      join('build', 'Release', 'spawn-helper'),
+      join('build', 'Debug', 'spawn-helper'),
+      join('prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper')
+    ]
+    const candidates = roots.flatMap((root) => candidateRelativePaths.map((relativePath) => join(root, relativePath)))
+
+    for (const candidate of candidates) {
+      if (!existsSync(candidate)) {
+        continue
+      }
+
+      const stats = statSync(candidate)
+      return {
+        nodePtyHelperPath: candidate,
+        nodePtyHelperExists: true,
+        nodePtyHelperExecutable: (stats.mode & 0o111) !== 0,
+        nodePtyHelperMode: formatFileMode(stats.mode),
+        nodePtyHelperError: null
+      }
+    }
+
+    return {
+      nodePtyHelperPath: candidates[0] ?? null,
+      nodePtyHelperExists: false,
+      nodePtyHelperExecutable: false,
+      nodePtyHelperMode: null,
+      nodePtyHelperError: 'node-pty spawn-helper was not found at the expected packaged paths'
+    }
+  } catch (error) {
+    return {
+      nodePtyHelperPath: null,
+      nodePtyHelperExists: null,
+      nodePtyHelperExecutable: null,
+      nodePtyHelperMode: null,
+      nodePtyHelperError: error instanceof Error ? error.message : 'Unable to inspect node-pty spawn-helper'
+    }
   }
 }
 

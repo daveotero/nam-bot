@@ -3,6 +3,9 @@ productName: NAM-BOT
 npmRebuild: false
 nodeGypRebuild: false
 buildDependenciesFromSource: false
+asarUnpack:
+  - node_modules/node-pty/**/*
+afterPack: build/after-pack.cjs
 directories:
   buildResources: build
   output: release

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-02
+
 ### Added
 
 - Jobs now support a `Manual` or `Auto-align` latency mode, defaulting new jobs to auto-align while remembering the user's last saved mode.
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Manual latency `0` now explicitly means no correction and no auto-calculation, preserving manually aligned capture workflows.
+
+### Fixed
+
+- macOS packages now unpack and verify the bundled `node-pty` helper, restoring executable permissions before DMGs are produced so packaged PTY training launch is less likely to fail before Python starts.
+- Training Launch diagnostics now report the packaged `node-pty` helper path, executable state, and file mode in Advanced Details and troubleshooting exports.
 
 ## [0.6.1] - 2026-07-02
 

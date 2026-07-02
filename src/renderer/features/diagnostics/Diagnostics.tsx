@@ -688,6 +688,11 @@ function buildAiTroubleshootingPrompt(
         `- Workspace root: ${formatMaybeText(trainingLaunchDiagnostics.workspaceRoot, 'Not reported')}`,
         `- App executable: ${formatMaybeText(trainingLaunchDiagnostics.appExecutablePath, 'Not reported')}`,
         `- Process arch: ${trainingLaunchDiagnostics.processArch}`,
+        `- node-pty helper path: ${formatMaybeText(trainingLaunchDiagnostics.nodePtyHelperPath, 'Not reported')}`,
+        `- node-pty helper exists: ${formatMaybeBoolean(trainingLaunchDiagnostics.nodePtyHelperExists)}`,
+        `- node-pty helper executable: ${formatMaybeBoolean(trainingLaunchDiagnostics.nodePtyHelperExecutable)}`,
+        `- node-pty helper mode: ${formatMaybeText(trainingLaunchDiagnostics.nodePtyHelperMode, 'Not reported')}`,
+        `- node-pty helper error: ${formatMaybeText(trainingLaunchDiagnostics.nodePtyHelperError, 'None')}`,
         ...trainingLaunchDiagnostics.checks.map(formatTrainingLaunchResultForPrompt),
         `- Launch errors: ${trainingLaunchDiagnostics.errors.length > 0 ? trainingLaunchDiagnostics.errors.map((entry) => compactText(entry)).join(' || ') : 'None'}`
       ].join('\n')
@@ -1562,6 +1567,11 @@ export default function Diagnostics() {
               <DiagnosticFact label="Workspace root" value={formatMaybeText(trainingLaunchDiagnostics?.workspaceRoot, 'Not reported')} />
               <DiagnosticFact label="App executable" value={formatMaybeText(trainingLaunchDiagnostics?.appExecutablePath, 'Not reported')} />
               <DiagnosticFact label="Process arch" value={trainingLaunchDiagnostics?.processArch ?? 'Not reported'} />
+              <DiagnosticFact label="node-pty helper" value={formatMaybeText(trainingLaunchDiagnostics?.nodePtyHelperPath, 'Not reported')} />
+              <DiagnosticFact label="node-pty helper exists" value={formatMaybeBoolean(trainingLaunchDiagnostics?.nodePtyHelperExists)} />
+              <DiagnosticFact label="node-pty helper executable" value={formatMaybeBoolean(trainingLaunchDiagnostics?.nodePtyHelperExecutable)} />
+              <DiagnosticFact label="node-pty helper mode" value={formatMaybeText(trainingLaunchDiagnostics?.nodePtyHelperMode, 'Not reported')} />
+              <DiagnosticFact label="node-pty helper error" value={formatMaybeText(trainingLaunchDiagnostics?.nodePtyHelperError, 'None')} />
               <DiagnosticFact label="Python version" value={formatMaybeText(acceleratorDiagnostics?.pythonVersion, 'Not reported')} />
               <DiagnosticFact label="Python executable" value={formatMaybeText(acceleratorDiagnostics?.pythonExecutable, 'Not reported')} />
               <DiagnosticFact label="Python platform" value={formatMaybeText(acceleratorDiagnostics?.pythonPlatform, 'Not reported')} />
