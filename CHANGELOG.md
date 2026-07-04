@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Failed and stopped training cards now prioritize `Create Draft` so users can edit settings before queueing another run.
+
+### Fixed
+
+- Auto-align preflight feedback now appears in the same terminal log as training, and expanded job details show the latency mode and actual delay used for the run.
+
 ## [0.6.2] - 2026-07-02
 
 ### Added

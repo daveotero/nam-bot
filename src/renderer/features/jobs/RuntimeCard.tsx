@@ -48,7 +48,6 @@ interface RuntimeCardProps {
   onUnqueue?: (jobId: string) => Promise<void>
   onCancel: (jobId: string) => Promise<void>
   onForceStop: (jobId: string) => Promise<void>
-  onRetry: (jobId: string) => Promise<void>
   onCreateDraftFromRuntime?: (runtime: JobRuntimeState) => Promise<void>
   onUseRuntimeAsTemplate?: (runtime: JobRuntimeState) => void
   onOpenFolder: (jobId: string) => Promise<void>
@@ -120,6 +119,44 @@ function buildArtifactLinks(runtime: JobRuntimeState, outputPath: string): Runti
   )
 }
 
+function formatLatencySamples(samples: number): string {
+  return `${samples} sample${Math.abs(samples) === 1 ? '' : 's'}`
+}
+
+function getLatencyModeLabel(runtime: JobRuntimeState): string {
+  const mode = runtime.latencyAlignment?.mode ?? runtime.frozenJob.trainingOverrides.latencyMode ?? 'manual'
+  return mode === 'auto' ? 'Auto-align' : 'Manual'
+}
+
+function getLatencyDelayLabel(runtime: JobRuntimeState): string {
+  const alignment = runtime.latencyAlignment
+  if (alignment?.delaySamples != null) {
+    return formatLatencySamples(alignment.delaySamples)
+  }
+
+  if (alignment?.status === 'auto_pending') {
+    return 'Analyzing...'
+  }
+  if (alignment?.status === 'auto_failed') {
+    return 'Failed'
+  }
+  if (alignment?.status === 'auto_skipped') {
+    return 'Preset locked'
+  }
+
+  const fallbackDelay = runtime.frozenJob.trainingOverrides.latencySamples
+  return typeof fallbackDelay === 'number' && Number.isFinite(fallbackDelay)
+    ? formatLatencySamples(fallbackDelay)
+    : 'Not set'
+}
+
+function getLatencyDelayTitle(runtime: JobRuntimeState): string {
+  const alignment = runtime.latencyAlignment
+  const details = [alignment?.message, alignment?.inputVersion ? `NAM input ${alignment.inputVersion}` : null]
+    .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+  return details.length > 0 ? details.join(' ') : getLatencyDelayLabel(runtime)
+}
+
 export function renderDisplayBadge(displayState: QueueDisplayState) {
   return (
     <span className={`queue-status-badge ${displayState.toLowerCase()}${displayState === 'Running' ? ' processing-text' : ''}`}>
@@ -141,7 +178,6 @@ export default function RuntimeCard({
   onUnqueue,
   onCancel,
   onForceStop,
-  onRetry,
   onCreateDraftFromRuntime,
   onUseRuntimeAsTemplate,
   onOpenFolder,
@@ -155,19 +191,21 @@ export default function RuntimeCard({
   const hasTerminalToggle = displayState !== 'Queued'
   const isFinishedDisplay = displayState === 'Successful' || displayState === 'Error'
   const isSuccessfulDisplay = displayState === 'Successful'
-  const isRetryableDisplay = displayState === 'Error'
   const outputPath = getOutputPath(runtime)
   const batchSourceName = runtime.frozenJob.batchSourceName?.trim() || ''
   const preset = presets.find((entry) => entry.id === runtime.frozenJob.presetId)
   const presetName = preset?.name || runtime.frozenJob.presetId || 'Unknown'
   const presetTag = preset ? formatPresetArchitectureTag(preset) : 'CUSTOM'
+  const latencyModeLabel = getLatencyModeLabel(runtime)
+  const latencyDelayLabel = getLatencyDelayLabel(runtime)
+  const latencyDelayTitle = getLatencyDelayTitle(runtime)
   const collapsedSummaryItems = getCollapsedSummaryItems(runtime, presetName, nowMs)
   const artifactLinks = buildArtifactLinks(runtime, outputPath)
   const esrItems = buildRuntimeEsrItems(runtime)
   const hasPrimaryActions = (displayState === 'Queued' && onUnqueue)
     || (displayState === 'Running' && stopAction)
-    || (isSuccessfulDisplay && (outputPath || onCreateDraftFromRuntime))
-    || isFinishedDisplay
+    || (isSuccessfulDisplay && outputPath)
+    || (isFinishedDisplay && (onCreateDraftFromRuntime || onUseRuntimeAsTemplate))
   const hasSecondaryActions = hasTerminalToggle || (isFinishedDisplay && onClearFinished)
 
   return (
@@ -254,17 +292,13 @@ export default function RuntimeCard({
                 </button>
               )}
 
-              {isRetryableDisplay && (
-                <button className={`btn btn-sm ${displayState === 'Error' ? 'btn-gold' : 'btn-secondary'}`} onClick={() => void onRetry(runtime.jobId)}>
-                  Retry
-                </button>
-              )}
-
-              {isSuccessfulDisplay && onCreateDraftFromRuntime && (
+              {isFinishedDisplay && onCreateDraftFromRuntime && (
                 <button
-                  className="btn btn-sm btn-secondary"
+                  className={`btn btn-sm ${displayState === 'Error' ? 'btn-gold' : 'btn-secondary'}`}
                   onClick={() => void onCreateDraftFromRuntime(runtime)}
-                  title="Create a new editable draft from this finished job"
+                  title={displayState === 'Error'
+                    ? 'Create an editable draft from this failed or stopped job'
+                    : 'Create a new editable draft from this finished job'}
                 >
                   Create Draft
                 </button>
@@ -325,6 +359,14 @@ export default function RuntimeCard({
                 </span>
               </div>
               <div className="runtime-detail-facts">
+                <div className="runtime-detail-fact">
+                  <span className="runtime-detail-label">Latency</span>
+                  <span className="runtime-detail-value">{latencyModeLabel}</span>
+                </div>
+                <div className="runtime-detail-fact">
+                  <span className="runtime-detail-label">Delay</span>
+                  <span className="runtime-detail-value" title={latencyDelayTitle}>{latencyDelayLabel}</span>
+                </div>
                 <div className="runtime-detail-fact">
                   <span className="runtime-detail-label">Epochs</span>
                   <span className="runtime-detail-value">{getPlannedEpochsLabel(runtime)}</span>

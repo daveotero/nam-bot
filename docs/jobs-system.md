@@ -219,8 +219,8 @@ Active jobs appear in the training section.
 
 Completed, failed, and stopped jobs appear in the finished section.
 
-- failed and stopped jobs can be retried
-- successful jobs can create a new editable draft for another pass
+- failed and stopped jobs can create a new editable draft so settings can be changed before queueing another pass
+- successful jobs can also create a new editable draft for another pass
 - successful result folders can be opened from the UI
 - finished cards can be used as templates for new editable drafts by selecting one or more new output audio files
 - terminal logs can be expanded after the run has finished
@@ -374,7 +374,8 @@ NAM-BOT's auto-align path intentionally reuses the latency analyzer from the off
 - recognized NAM training DIs with built-in ticks, including v2 and v3, can be analyzed because NAM stores separate tick-location data for each version
 - custom or unrecognized input files may fail auto-align and should use manual latency instead
 - if NAM cannot calculate a recommended delay, the job fails before training starts so the user can switch to `Manual` and enter a known value
-- when auto-align succeeds, the queue log shows the calculated sample delay before `nam-full` starts
+- expanded training cards show compact latency details beside the preset details: `Latency` (`Manual` or `Auto-align`) and the actual `Delay` used for the run
+- terminal logs include NAM-BOT preflight annotations for manual delay, auto-align start, auto-align result, warnings, and the handoff into `nam-full`
 
 This is a preflight step because `nam-full` expects a concrete `data.common.delay` value. NAM-BOT calculates that value first, then launches `nam-full` with ordinary config files.
 
@@ -414,12 +415,11 @@ NAM-BOT now defaults to local A2 training through the `a2-packed-wavenet` preset
 - the same A2 gate runs again before training starts, using the known Diagnostics version rather than launching another version probe
 - A1 and custom presets are not blocked by this A2-specific minimum version gate
 
-### Unqueue And Retry
+### Unqueue And Finished Drafts
 
 - `Unqueue` restores a queued item back into drafts.
 - `Unqueue All` restores every waiting queue item back into drafts.
-- `Retry` reuses the exact frozen job from a failed or stopped run and schedules it again.
-- `Create Draft` copies a successful finished run into Drafts so the user can tweak settings before queueing another pass.
+- `Create Draft` copies a finished run into Drafts so the user can tweak settings before queueing another pass. This is the primary recovery action for failed and stopped jobs.
 - `Clear Finished` removes finished history items from the queue manager view.
 - `Use as Template` on a finished history item opens the batch file picker and creates new editable drafts from that frozen run's settings without immediately queueing them.
 

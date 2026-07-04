@@ -163,6 +163,57 @@ describe('QueueManager A2 diagnostics gate', () => {
     await expect(queueManager.validateJobCanTrain(buildJobSpec())).rejects.toThrow('Installed: 0.12.3')
   })
 
+  it('records auto-align delay in runtime details and terminal log', async () => {
+    const queueManager = createQueueManager()
+    queueManager.setKnownNamVersion(defaultSettings, '0.13.0')
+    analyzeNamLatencyMock.mockResolvedValue({
+      ok: true,
+      recommendedLatency: 42,
+      inputVersion: '3.0.0',
+      strongInputMatch: true,
+      warnings: {
+        matchesLookahead: false,
+        disagreementTooHigh: false,
+        notDetected: false
+      },
+      delays: [42],
+      errorMessage: null,
+      output: 'NAM_BOT_LATENCY_ANALYSIS={"ok":true}'
+    })
+    runNamFullMock.mockImplementation(async (_settings, _args, hooks) => {
+      hooks.onStarted(1234)
+      hooks.onTerminalData('training started\n')
+      hooks.onExit(0)
+      return {
+        cancel: vi.fn(),
+        forceKill: vi.fn(async () => undefined),
+        forceKillSync: vi.fn()
+      }
+    })
+
+    queueManager.addToQueue(buildJobSpec({
+      trainingOverrides: {
+        latencyMode: 'auto',
+        latencySamples: 0
+      }
+    }))
+
+    await queueManager.startQueue()
+
+    const [runtime] = queueManager.getQueue()
+    expect(runtime.latencyAlignment).toMatchObject({
+      mode: 'auto',
+      status: 'auto_applied',
+      delaySamples: 42,
+      inputVersion: '3.0.0'
+    })
+    expect(runtime.terminalLogPath).toBeTruthy()
+    const terminalLog = readFileSync(runtime.terminalLogPath!, 'utf-8')
+    expect(terminalLog).toContain('[NAM-BOT] Auto-aligning input/output latency with the NAM analyzer...')
+    expect(terminalLog).toContain('[NAM-BOT] Auto-aligned latency using NAM input 3.0.0: 42 samples.')
+    expect(terminalLog).toContain('training started')
+  })
+
   it('copies the finalized model beside the output audio when requested', async () => {
     const queueManager = createQueueManager()
     const outputAudioDirectory = `${mockPaths.userDataPath}/captures`

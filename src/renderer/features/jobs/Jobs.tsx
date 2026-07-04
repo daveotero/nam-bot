@@ -829,11 +829,6 @@ export default function Jobs() {
     await window.namBot.jobs.forceStop(jobId)
   }
 
-  const handleRetry = async (jobId: string) => {
-    await window.namBot.jobs.retry(jobId)
-    await loadData()
-  }
-
   const handleDuplicate = async (jobId: string) => {
     const newJob = await window.namBot.jobs.duplicate(jobId) as JobSpec | null
     if (newJob) {
@@ -1095,7 +1090,6 @@ export default function Jobs() {
                       onToggleLogs={(entry) => toggleLogs(entry.jobId)}
                       onCancel={handleCancel}
                       onForceStop={handleForceStop}
-                      onRetry={handleRetry}
                       onCreateDraftFromRuntime={handleCreateDraftFromRuntime}
                       onUseRuntimeAsTemplate={handleUseRuntimeAsTemplate}
                       onOpenFolder={async (jobId) => { await window.namBot.jobs.openResultFolder(jobId) }}
@@ -1132,7 +1126,6 @@ export default function Jobs() {
                       onToggleLogs={(entry) => toggleLogs(entry.jobId)}
                       onCancel={handleCancel}
                       onForceStop={handleForceStop}
-                      onRetry={handleRetry}
                       onCreateDraftFromRuntime={handleCreateDraftFromRuntime}
                       onUseRuntimeAsTemplate={handleUseRuntimeAsTemplate}
                       onOpenFolder={async (jobId) => { await window.namBot.jobs.openResultFolder(jobId) }}

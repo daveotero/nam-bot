@@ -33,6 +33,8 @@ export type {
   ImportedPresetResult,
   JobCheckpointSummary,
   JobDeviceSummary,
+  JobLatencyAlignmentStatus,
+  JobLatencyAlignmentSummary,
   JobLogSummary,
   JobLatencyMode,
   JobPackedSubmodelCheckpointSummary,

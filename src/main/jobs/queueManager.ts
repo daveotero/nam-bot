@@ -27,6 +27,8 @@ import { getTrainingPresetById } from '../persistence/presetStore'
 import {
   JobCheckpointSummary,
   JobDeviceSummary,
+  JobLatencyAlignmentStatus,
+  JobLatencyAlignmentSummary,
   JobPackedSubmodelCheckpointSummary,
   JobRuntimeState,
   JobSpec,
@@ -36,7 +38,8 @@ import {
   buildNamMetadataPatch,
   defaultJobSpec,
   isA2TrainingPreset,
-  normalizeJobSpec
+  normalizeJobSpec,
+  TrainingPresetFile
 } from '../types/jobs'
 import { AppSettings } from '../types'
 import {
@@ -69,6 +72,7 @@ const LIGHTNING_BEST_CHECKPOINT_PATTERN = new RegExp(
 const ANSI_PATTERN = /\u001b\[[0-9;?]*[ -/]*[@-~]/g
 const OSC_PATTERN = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
 const CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u007f]/g
+const LATENCY_ALIGNMENT_STATUSES: JobLatencyAlignmentStatus[] = ['manual', 'auto_pending', 'auto_applied', 'auto_skipped', 'auto_failed']
 type RunJobResult = 'completed' | 'blocked'
 
 interface KnownNamVersion {
@@ -99,6 +103,46 @@ interface ParsedEpochProgress {
 
 function formatLatencyAnalysisVersion(inputVersion: string | null): string {
   return inputVersion ? ` using NAM input ${inputVersion}` : ''
+}
+
+function normalizeLatencySamples(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null
+}
+
+function getManualLatencySamples(jobSpec: JobSpec): number {
+  return normalizeLatencySamples(jobSpec.trainingOverrides.latencySamples) ?? 0
+}
+
+function formatLatencySamples(samples: number): string {
+  return `${samples} sample${Math.abs(samples) === 1 ? '' : 's'}`
+}
+
+function createInitialLatencyAlignment(jobSpec: JobSpec): JobLatencyAlignmentSummary {
+  if (jobSpec.trainingOverrides.latencyMode === 'auto') {
+    return {
+      mode: 'auto',
+      status: 'auto_pending',
+      delaySamples: null,
+      inputVersion: null,
+      message: 'Waiting to run NAM latency analyzer.'
+    }
+  }
+
+  const delaySamples = getManualLatencySamples(jobSpec)
+  return {
+    mode: 'manual',
+    status: 'manual',
+    delaySamples,
+    inputVersion: null,
+    message: `Manual delay: ${formatLatencySamples(delaySamples)}.`
+  }
+}
+
+function getPresetLockedLatencySamples(preset: TrainingPresetFile): number | null {
+  const dataCommon = isRecord(preset.expert.data) && isRecord(preset.expert.data.common)
+    ? preset.expert.data.common
+    : null
+  return normalizeLatencySamples(dataCommon?.delay)
 }
 
 function buildBackendSettingsKey(settings: AppSettings): string {
@@ -676,6 +720,29 @@ function normalizePackedSubmodels(value: unknown): JobPackedSubmodelCheckpointSu
   return submodels.length > 0 ? submodels : undefined
 }
 
+function normalizeLatencyAlignment(value: unknown): JobLatencyAlignmentSummary | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  const mode = value.mode === 'auto' || value.mode === 'manual' ? value.mode : null
+  const status = typeof value.status === 'string' && LATENCY_ALIGNMENT_STATUSES.includes(value.status as JobLatencyAlignmentStatus)
+    ? value.status as JobLatencyAlignmentStatus
+    : null
+
+  if (!mode || !status) {
+    return undefined
+  }
+
+  return {
+    mode,
+    status,
+    delaySamples: normalizeLatencySamples(value.delaySamples),
+    inputVersion: typeof value.inputVersion === 'string' ? value.inputVersion : null,
+    message: typeof value.message === 'string' ? value.message : null
+  }
+}
+
 function normalizeProgress(value: unknown): JobTerminalProgress | undefined {
   if (typeof value !== 'object' || value === null) {
     return undefined
@@ -789,6 +856,7 @@ function normalizeRuntimeState(value: unknown): JobRuntimeState | null {
               : null
         }
       : undefined,
+    latencyAlignment: normalizeLatencyAlignment(candidate.latencyAlignment),
     checkpointSummary: typeof candidate.checkpointSummary === 'object' && candidate.checkpointSummary !== null
       ? {
           checkpointCount:
@@ -844,13 +912,28 @@ export class QueueManager extends EventEmitter {
   private outputPollTimer: NodeJS.Timeout | null = null
   private knownNamVersion: KnownNamVersion | null = null
 
-  private appendUserMessage(runtime: JobRuntimeState, message: string): void {
+  private appendTerminalAnnotation(runtime: JobRuntimeState, message: string): void {
+    if (!runtime.terminalLogPath) {
+      return
+    }
+
+    const annotation = `[NAM-BOT] ${message.replace(/\r?\n/g, '\n[NAM-BOT] ')}\n`
+    appendFileSync(runtime.terminalLogPath, annotation, 'utf-8')
+    if (runtime.publishedTerminalLogPath) {
+      appendFileSync(runtime.publishedTerminalLogPath, annotation, 'utf-8')
+    }
+  }
+
+  private appendUserMessage(runtime: JobRuntimeState, message: string, options?: { persistToTerminalLog?: boolean }): void {
     if (runtime.userMessages[runtime.userMessages.length - 1] === message) {
       return
     }
     runtime.userMessages.push(message)
     if (runtime.userMessages.length > 250) {
       runtime.userMessages = runtime.userMessages.slice(-250)
+    }
+    if (options?.persistToTerminalLog) {
+      this.appendTerminalAnnotation(runtime, message)
     }
   }
 
@@ -1376,6 +1459,7 @@ export class QueueManager extends EventEmitter {
       percent: 0
     }
     runtime.deviceSummary = undefined
+    runtime.latencyAlignment = undefined
     runtime.checkpointSummary = undefined
     runtime.stopRequestedAt = undefined
     runtime.stopMode = null
@@ -1466,6 +1550,7 @@ export class QueueManager extends EventEmitter {
         rate: null,
         percent: 0
       },
+      latencyAlignment: createInitialLatencyAlignment(jobSpec),
       userMessages: ['Job queued and waiting for training to start.'],
       stopMode: null,
       logSummary: {
@@ -1551,6 +1636,7 @@ export class QueueManager extends EventEmitter {
     runtime.logSummary = undefined
     runtime.terminalProgress = undefined
     runtime.deviceSummary = undefined
+    runtime.latencyAlignment = undefined
     runtime.checkpointSummary = undefined
     runtime.stopRequestedAt = undefined
     runtime.stopMode = null
@@ -1630,10 +1716,15 @@ export class QueueManager extends EventEmitter {
       rate: null,
       percent: 0
     }
+    runtime.latencyAlignment = createInitialLatencyAlignment(jobSpec)
     runtime.checkpointSummary = undefined
     runtime.stopRequestedAt = undefined
     runtime.stopMode = null
     writeFileSync(terminalPath, '', 'utf-8')
+    if (runtime.latencyAlignment.mode === 'manual') {
+      const delaySamples = runtime.latencyAlignment.delaySamples ?? 0
+      this.appendUserMessage(runtime, `Using manual latency delay: ${formatLatencySamples(delaySamples)}.`, { persistToTerminalLog: true })
+    }
     this.emitJobUpdate(runtime)
 
     const transcriptAccumulator: TranscriptAccumulator = { currentLine: '' }
@@ -1767,7 +1858,14 @@ export class QueueManager extends EventEmitter {
       let jobSpecForConfig = jobSpec
 
       if (jobSpec.trainingOverrides.latencyMode === 'auto' && !latencyLocked) {
-        this.appendUserMessage(runtime, 'Auto-aligning input/output latency with the NAM analyzer...')
+        runtime.latencyAlignment = {
+          mode: 'auto',
+          status: 'auto_pending',
+          delaySamples: null,
+          inputVersion: null,
+          message: 'Running NAM latency analyzer.'
+        }
+        this.appendUserMessage(runtime, 'Auto-aligning input/output latency with the NAM analyzer...', { persistToTerminalLog: true })
         runtime.logSummary = {
           ...runtime.logSummary,
           latestStructuredLine: 'Auto-aligning latency'
@@ -1776,8 +1874,18 @@ export class QueueManager extends EventEmitter {
 
         const latencyAnalysis = await analyzeNamLatency(this.settings!, jobSpec.inputAudioPath, jobSpec.outputAudioPath)
         if (!latencyAnalysis.ok || latencyAnalysis.recommendedLatency == null) {
+          const failureReason = latencyAnalysis.errorMessage ?? 'NAM could not calculate a recommended delay. Switch latency to Manual and enter a value, or use a recognized NAM standard input file.'
+          const failureMessage = `Auto latency alignment failed: ${failureReason}`
+          runtime.latencyAlignment = {
+            mode: 'auto',
+            status: 'auto_failed',
+            delaySamples: null,
+            inputVersion: latencyAnalysis.inputVersion,
+            message: failureReason
+          }
+          this.appendUserMessage(runtime, failureMessage, { persistToTerminalLog: true })
           throw new Error(
-            `Auto latency alignment failed: ${latencyAnalysis.errorMessage ?? 'NAM could not calculate a recommended delay. Switch latency to Manual and enter a value, or use a recognized NAM standard input file.'}`
+            failureMessage
           )
         }
 
@@ -1791,25 +1899,42 @@ export class QueueManager extends EventEmitter {
         }
 
         const versionLabel = formatLatencyAnalysisVersion(latencyAnalysis.inputVersion)
-        this.appendUserMessage(runtime, `Auto-aligned latency${versionLabel}: ${resolvedLatencySamples} samples.`)
+        const alignmentMessage = `Auto-aligned latency${versionLabel}: ${formatLatencySamples(resolvedLatencySamples)}.`
+        runtime.latencyAlignment = {
+          mode: 'auto',
+          status: 'auto_applied',
+          delaySamples: resolvedLatencySamples,
+          inputVersion: latencyAnalysis.inputVersion,
+          message: alignmentMessage
+        }
+        this.appendUserMessage(runtime, alignmentMessage, { persistToTerminalLog: true })
 
         if (latencyAnalysis.warnings?.matchesLookahead) {
-          this.appendUserMessage(runtime, 'Latency warning: the detected delay matched NAM analyzer lookahead, which can indicate unusual capture data.')
+          this.appendUserMessage(runtime, 'Latency warning: the detected delay matched NAM analyzer lookahead, which can indicate unusual capture data.', { persistToTerminalLog: true })
         }
         if (latencyAnalysis.warnings?.disagreementTooHigh) {
-          this.appendUserMessage(runtime, 'Latency warning: detected responses disagreed more than expected. If the model sounds wrong, try measuring latency manually.')
+          this.appendUserMessage(runtime, 'Latency warning: detected responses disagreed more than expected. If the model sounds wrong, try measuring latency manually.', { persistToTerminalLog: true })
         }
       } else if (jobSpec.trainingOverrides.latencyMode === 'auto' && latencyLocked) {
-        this.appendUserMessage(runtime, 'Skipping auto latency alignment because the selected preset locks delay in its expert data config.')
+        const lockedLatencySamples = getPresetLockedLatencySamples(preset)
+        const lockedDelaySuffix = lockedLatencySamples == null ? '' : ` (${formatLatencySamples(lockedLatencySamples)})`
+        runtime.latencyAlignment = {
+          mode: 'auto',
+          status: 'auto_skipped',
+          delaySamples: lockedLatencySamples,
+          inputVersion: null,
+          message: `Selected preset locks delay in its expert data config${lockedDelaySuffix}.`
+        }
+        this.appendUserMessage(runtime, `Skipping auto latency alignment because the selected preset locks delay in its expert data config${lockedDelaySuffix}.`, { persistToTerminalLog: true })
       }
 
-      this.appendUserMessage(runtime, 'Generating NAM training configuration files...')
+      this.appendUserMessage(runtime, 'Generating NAM training configuration files...', { persistToTerminalLog: true })
       const configPaths = buildJobConfigs(jobSpecForConfig, workspaceDir, preset)
       runtime.generatedConfigPaths = configPaths
       await this.prepareLearningConfigForRuntime(configPaths, runtime)
 
-      this.appendUserMessage(runtime, 'Starting NAM training...')
-      this.appendUserMessage(runtime, `Training output root: ${jobSpec.outputRootDir}`)
+      this.appendUserMessage(runtime, 'Starting NAM training...', { persistToTerminalLog: true })
+      this.appendUserMessage(runtime, `Training output root: ${jobSpec.outputRootDir}`, { persistToTerminalLog: true })
       this.emitJobUpdate(runtime)
 
       await runTrainingProcess(configPaths)

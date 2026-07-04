@@ -18,6 +18,7 @@ export type ArchitectureSize = 'standard' | 'lite' | 'feather' | 'nano' | 'packe
 export type NamGearType = 'amp' | 'pedal' | 'pedal_amp' | 'amp_cab' | 'amp_pedal_cab' | 'preamp' | 'studio'
 export type NamToneType = 'clean' | 'overdrive' | 'crunch' | 'hi_gain' | 'fuzz'
 export type JobLatencyMode = 'manual' | 'auto'
+export type JobLatencyAlignmentStatus = 'manual' | 'auto_pending' | 'auto_applied' | 'auto_skipped' | 'auto_failed'
 
 export interface JobLogSummary {
   latestTerminalLine?: string | null
@@ -42,6 +43,14 @@ export interface JobDeviceSummary {
   cudaDeviceCount?: number | null
   deviceName?: string | null
   startupMessage?: string | null
+}
+
+export interface JobLatencyAlignmentSummary {
+  mode: JobLatencyMode
+  status: JobLatencyAlignmentStatus
+  delaySamples?: number | null
+  inputVersion?: string | null
+  message?: string | null
 }
 
 export interface JobPackedSubmodelCheckpointSummary {
@@ -188,6 +197,7 @@ export interface JobRuntimeState {
   logSummary?: JobLogSummary
   terminalProgress?: JobTerminalProgress
   deviceSummary?: JobDeviceSummary
+  latencyAlignment?: JobLatencyAlignmentSummary
   checkpointSummary?: JobCheckpointSummary
   stopRequestedAt?: string
   stopMode?: JobStopMode | null
