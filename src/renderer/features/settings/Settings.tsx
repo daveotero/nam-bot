@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppStore, AppSettings, BackendValidationSummary } from '../../state/store'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
@@ -42,7 +42,10 @@ export default function Settings() {
     settings,
     validation,
     condaDiscovery,
-    isLoading,
+    isSettingsSaving,
+    isBackendValidationLoading,
+    settingsSaveError,
+    validationError,
     loadSettings,
     saveSettings,
     validateBackend,
@@ -50,6 +53,9 @@ export default function Settings() {
   } = useAppStore()
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(null)
   const [useCustomCondaPath, setUseCustomCondaPath] = useState(false)
+  const saveTimerRef = useRef<number | null>(null)
+  const latestSettingsRef = useRef<AppSettings | null>(null)
+  const persistedSettingsRef = useRef<AppSettings | null>(null)
 
   useEffect(() => {
     void loadSettings()
@@ -65,23 +71,58 @@ export default function Settings() {
     }
   }, [settings, localSettings])
 
-  // Debounced auto-save
   useEffect(() => {
-    if (!localSettings || !settings) return
-
-    // Skip if identical to current store settings
-    if (JSON.stringify(localSettings) === JSON.stringify(settings)) {
+    latestSettingsRef.current = localSettings
+    persistedSettingsRef.current = settings
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    if (!localSettings || !settings || JSON.stringify(localSettings) === JSON.stringify(settings)) {
       return
     }
 
-    const timer = setTimeout(() => {
-      void saveSettings(localSettings)
-    }, 1000)
-
-    return () => clearTimeout(timer)
+    const settingsSnapshot = localSettings
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null
+      void saveSettings(settingsSnapshot).catch(() => undefined)
+    }, 500)
   }, [localSettings, settings, saveSettings])
 
-  const handleValidate = async () => {
+  useEffect(() => () => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current)
+    }
+    const latestSettings = latestSettingsRef.current
+    const persistedSettings = persistedSettingsRef.current
+    if (latestSettings && JSON.stringify(latestSettings) !== JSON.stringify(persistedSettings)) {
+      void saveSettings(latestSettings).catch(() => undefined)
+    }
+  }, [saveSettings])
+
+  const handleSave = async (): Promise<boolean> => {
+    if (!localSettings) {
+      return false
+    }
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    try {
+      await saveSettings(localSettings)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const handleValidate = async (): Promise<void> => {
+    if (localSettings && JSON.stringify(localSettings) !== JSON.stringify(settings)) {
+      const saved = await handleSave()
+      if (!saved) {
+        return
+      }
+    }
     await validateBackend()
   }
 
@@ -113,17 +154,27 @@ export default function Settings() {
   const displayedCondaPath: string = usingPathConda
     ? (condaDiscovery?.resolvedPath || localSettings.condaExecutablePath || (window.namBot.platform === 'win32' ? 'conda.exe' : 'conda'))
     : (localSettings.condaExecutablePath || '')
+  const hasUnsavedChanges = JSON.stringify(localSettings) !== JSON.stringify(settings)
+  const isBackendBusy = isSettingsSaving || isBackendValidationLoading
 
   return (
     <div className="layout-main">
       <div className="panel" style={{ marginBottom: '16px' }}>
         <div className="panel-header">
           <h3>Settings</h3>
-          {isLoading && (
-            <span style={{ fontSize: '13px', color: 'var(--text-steel)', fontFamily: 'var(--font-arcade)' }}>
-              Saving...
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', color: settingsSaveError ? 'var(--neon-magenta)' : 'var(--text-steel)', fontFamily: 'var(--font-arcade)' }}>
+              {settingsSaveError ? `Save failed: ${settingsSaveError}` : isSettingsSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved changes' : 'Saved'}
             </span>
-          )}
+            <button
+              type="button"
+              className={`btn btn-sm ${hasUnsavedChanges ? 'btn-green' : 'btn-secondary'}`}
+              disabled={!hasUnsavedChanges || isBackendBusy}
+              onClick={() => void handleSave()}
+            >
+              Save Settings
+            </button>
+          </div>
         </div>
       </div>
 
@@ -241,12 +292,17 @@ export default function Settings() {
 
         <div style={{ marginTop: '16px' }}>
           <button 
-            className={`btn btn-green ${isLoading ? 'processing-text' : ''}`} 
+            className={`btn btn-green ${isBackendBusy ? 'processing-text' : ''}`}
             onClick={handleValidate} 
-            disabled={isLoading}
+            disabled={isBackendBusy}
           >
-            {isLoading ? 'Validating' : (validation?.overallOk ? '✓ Backend Ready' : 'Validate Backend')}
+            {isBackendValidationLoading ? 'Validating' : (!hasUnsavedChanges && validation?.overallOk ? '✓ Backend Ready' : 'Validate Backend')}
           </button>
+          {validationError && (
+            <p style={{ marginTop: '8px', color: 'var(--neon-magenta)', fontSize: '13px' }}>
+              Validation failed: {validationError}
+            </p>
+          )}
         </div>
       </div>
 

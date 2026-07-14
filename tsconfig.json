@@ -12,8 +12,5 @@
     "noEmit": true,
     "declaration": true
   },
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "./tsconfig.web.json" }
-  ]
+  "files": []
 }

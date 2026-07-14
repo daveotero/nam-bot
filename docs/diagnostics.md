@@ -31,6 +31,9 @@ The Diagnostics screen auto-loads its checks when the page opens.
 - accelerator diagnostics run if there is no current accelerator snapshot
 - training launch diagnostics run if there is no current launch-readiness snapshot
 - the `Re-check All` button refreshes backend, accelerator, training launch, and NAM version checks together
+- a failed automatic request is retained as an error instead of being retried in a render loop
+- failed checks show a visible error and wait for `Re-check All` before trying again
+- results are tied to the settings revision that started them; changing Settings discards stale in-flight results
 
 This keeps the page useful as a quick status check even when the user has not manually triggered anything yet.
 

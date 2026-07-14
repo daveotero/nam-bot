@@ -19,6 +19,7 @@ export interface NamBotApi {
   }
   jobs: {
     createDraft: (input?: unknown) => Promise<unknown>
+    createDraftBatch: (input: unknown) => Promise<unknown[]>
     saveDraft: (job: unknown) => Promise<unknown>
     deleteDraft: (jobId: string) => Promise<void>
     listDrafts: () => Promise<unknown[]>
@@ -85,6 +86,7 @@ const api: NamBotApi = {
   },
   jobs: {
     createDraft: (input) => ipcRenderer.invoke('jobs:createDraft', input),
+    createDraftBatch: (input) => ipcRenderer.invoke('jobs:createDraftBatch', input),
     saveDraft: (job) => ipcRenderer.invoke('jobs:saveDraft', job),
     deleteDraft: (jobId) => ipcRenderer.invoke('jobs:deleteDraft', jobId),
     listDrafts: () => ipcRenderer.invoke('jobs:listDrafts'),

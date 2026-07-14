@@ -875,7 +875,11 @@ function computeLockedJobFields(expert: TrainingPresetExpertBlocks): Array<'epoc
   return lockedFields
 }
 
-export function createTrainingPreset(partial?: Partial<TrainingPresetFile>): TrainingPresetFile {
+type TrainingPresetInput = Omit<Partial<TrainingPresetFile>, 'values'> & {
+  values?: Partial<TrainingPresetValues>
+}
+
+export function createTrainingPreset(partial?: TrainingPresetInput): TrainingPresetFile {
   const now = new Date().toISOString()
   const values = {
     ...DEFAULT_TRAINING_PRESET_VALUES,
@@ -1066,8 +1070,7 @@ export function normalizeJobSpec(value: unknown): JobSpec {
 
   const legacyLearningSettings = isRecord(value.learningSettings) ? value.learningSettings : {}
   const legacyModelSettings = isRecord(value.modelSettings) ? value.modelSettings : {}
-  const hasTrainingOverrides = isRecord(value.trainingOverrides)
-  const trainingOverrides = hasTrainingOverrides ? value.trainingOverrides : {}
+  const trainingOverrides = isRecord(value.trainingOverrides) ? value.trainingOverrides : {}
   const legacyModelType = asString(legacyModelSettings.modelType, '')
   const hasLegacyLatencySamples = Object.prototype.hasOwnProperty.call(trainingOverrides, 'latencySamples')
   const latencyModeFallback: JobLatencyMode = Object.prototype.hasOwnProperty.call(trainingOverrides, 'latencyMode')

@@ -1,8 +1,9 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import log from 'electron-log/main'
 import { createDefaultUpdateStatus, type UpdateState, type UpdateStatus } from '../../shared/update'
+import { atomicWriteJsonSync, readJsonWithBackupSync } from './atomicFile'
 
 interface StoredUpdateStatus {
   currentVersion?: string
@@ -37,8 +38,7 @@ export function loadUpdateStatus(): UpdateStatus {
       return createDefaultUpdateStatus(app.getVersion())
     }
 
-    const data = readFileSync(updateStatusPath, 'utf-8')
-    const parsed = JSON.parse(data) as StoredUpdateStatus
+    const parsed = readJsonWithBackupSync(updateStatusPath) as StoredUpdateStatus
     return normalizeStoredStatus(parsed)
   } catch (error) {
     log.error('Failed to load update status:', error)
@@ -52,7 +52,7 @@ export function saveUpdateStatus(status: UpdateStatus): void {
       mkdirSync(userDataPath, { recursive: true })
     }
 
-    writeFileSync(updateStatusPath, JSON.stringify(status, null, 2), 'utf-8')
+    atomicWriteJsonSync(updateStatusPath, status)
   } catch (error) {
     log.error('Failed to save update status:', error)
   }

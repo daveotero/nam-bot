@@ -16,7 +16,9 @@ function buildRuntime(overrides: Partial<JobRuntimeState> = {}): JobRuntimeState
     frozenJob: {
       ...defaultJobSpec,
       id: 'failed-runtime-card',
-      name: 'Failed Runtime Card'
+      name: 'Failed Runtime Card',
+      createdAt: '2026-07-03T12:00:00.000Z',
+      updatedAt: '2026-07-03T12:00:00.000Z'
     },
     userMessages: ['Training exited with code 1.'],
     ...overrides

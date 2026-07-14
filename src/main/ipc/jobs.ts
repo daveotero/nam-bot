@@ -1,14 +1,37 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { existsSync, copyFileSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, copyFileSync, readFileSync, statSync } from 'fs'
 import log from 'electron-log/main'
 import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { getQueueManager } from '../jobs/queueManager'
 import { loadSettings } from '../persistence/settingsStore'
 import { JobRuntimeState, JobSpec, defaultJobSpec, normalizeJobSpec } from '../types/jobs'
+import {
+  atomicWriteJsonSync,
+  readJsonWithBackupSync,
+  removeFileIfExistsSync
+} from '../persistence/atomicFile'
 
 const draftsPath = join(app.getPath('userData'), 'drafts.json')
+const draftQueueTransactionPath = join(app.getPath('userData'), 'draft-queue-transaction.json')
 const drafts: Map<string, JobSpec> = new Map()
+
+interface DraftQueueTransaction {
+  draftIds: string[]
+  queuedJobIds: string[]
+}
+
+interface DraftBatchSource {
+  kind: 'draft' | 'runtime'
+  id: string
+}
+
+interface DraftBatchRequest {
+  batchId: string
+  batchSourceName: string
+  drafts: unknown[]
+  source: DraftBatchSource | null
+}
 
 type JobArtifactTarget = 'workspace' | 'output' | 'workspace-log' | 'run-log' | 'model'
 
@@ -61,8 +84,16 @@ function cloneJobSpec(job: JobSpec): JobSpec {
   return JSON.parse(JSON.stringify(job)) as JobSpec
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function saveDraftCollection(collection: Map<string, JobSpec>): void {
+  atomicWriteJsonSync(draftsPath, Array.from(collection.values()))
+}
+
 function saveDrafts(): void {
-  writeFileSync(draftsPath, JSON.stringify(Array.from(drafts.values()), null, 2), 'utf-8')
+  saveDraftCollection(drafts)
 }
 
 function loadDrafts(): void {
@@ -71,7 +102,7 @@ function loadDrafts(): void {
   }
 
   try {
-    const parsed = JSON.parse(readFileSync(draftsPath, 'utf-8')) as unknown
+    const parsed = readJsonWithBackupSync(draftsPath)
     if (!Array.isArray(parsed)) {
       return
     }
@@ -91,17 +122,80 @@ function loadDrafts(): void {
   }
 }
 
-function createDraftFromInput(input?: Partial<JobSpec>): JobSpec {
+function createDraftFromInput(input?: unknown): JobSpec {
   const now = new Date().toISOString()
   const normalized = normalizeJobSpec(input)
+  const candidate = isRecord(input) ? input : {}
   return {
     ...JSON.parse(JSON.stringify(defaultJobSpec)) as Omit<JobSpec, 'id' | 'createdAt' | 'updatedAt'>,
     ...normalized,
-    id: input?.id ?? uuidv4(),
+    id: typeof candidate.id === 'string' && candidate.id.length > 0 ? candidate.id : uuidv4(),
     name: normalized.name || 'New Job',
-    createdAt: input?.createdAt ?? now,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: now
   }
+}
+
+function parseDraftBatchRequest(input: unknown): DraftBatchRequest {
+  if (!isRecord(input)
+    || typeof input.batchId !== 'string'
+    || input.batchId.trim().length === 0
+    || typeof input.batchSourceName !== 'string'
+    || !Array.isArray(input.drafts)
+    || input.drafts.length === 0) {
+    throw new Error('Invalid draft batch request.')
+  }
+
+  let source: DraftBatchSource | null = null
+  if (isRecord(input.source)) {
+    const kind = input.source.kind
+    const id = input.source.id
+    if ((kind === 'draft' || kind === 'runtime') && typeof id === 'string' && id.length > 0) {
+      source = { kind, id }
+    }
+  }
+
+  return {
+    batchId: input.batchId,
+    batchSourceName: input.batchSourceName.trim() || 'Batch Training',
+    drafts: input.drafts,
+    source
+  }
+}
+
+function recoverDraftQueueTransaction(queueManager: ReturnType<typeof getQueueManager>): void {
+  if (!existsSync(draftQueueTransactionPath)) {
+    return
+  }
+
+  try {
+    const parsed = readJsonWithBackupSync(draftQueueTransactionPath)
+    if (!isRecord(parsed) || !Array.isArray(parsed.draftIds) || !Array.isArray(parsed.queuedJobIds)) {
+      removeFileIfExistsSync(draftQueueTransactionPath)
+      return
+    }
+
+    const draftIds = parsed.draftIds.filter((value): value is string => typeof value === 'string')
+    const queuedJobIds = parsed.queuedJobIds.filter((value): value is string => typeof value === 'string')
+    const durableQueueIds = new Set(queueManager.getQueue().map((runtime) => runtime.jobId))
+    if (queuedJobIds.length > 0 && queuedJobIds.every((jobId) => durableQueueIds.has(jobId))) {
+      for (const draftId of draftIds) {
+        drafts.delete(draftId)
+      }
+      saveDrafts()
+    }
+    removeFileIfExistsSync(draftQueueTransactionPath)
+  } catch (error) {
+    log.error('Failed to recover draft-to-queue transaction:', error)
+  }
+}
+
+function beginDraftQueueTransaction(transaction: DraftQueueTransaction): void {
+  atomicWriteJsonSync(draftQueueTransactionPath, transaction)
+}
+
+function finishDraftQueueTransaction(): void {
+  removeFileIfExistsSync(draftQueueTransactionPath)
 }
 
 function broadcastQueue(queue: JobRuntimeState[]): void {
@@ -122,6 +216,7 @@ export function setupJobIpcHandlers(): void {
 
   const queueManager = getQueueManager()
   queueManager.setSettings(loadSettings())
+  recoverDraftQueueTransaction(queueManager)
 
   queueManager.on('queueUpdated', (queue: JobRuntimeState[]) => {
     broadcastQueue(queue)
@@ -136,6 +231,60 @@ export function setupJobIpcHandlers(): void {
     drafts.set(job.id, job)
     saveDrafts()
     return job
+  })
+
+  ipcMain.handle('jobs:createDraftBatch', async (_event, input: unknown) => {
+    const request = parseDraftBatchRequest(input)
+    const existing = Array.from(drafts.values()).filter((draft) => draft.batchId === request.batchId)
+    if (existing.length > 0) {
+      const existingPaths = new Set(existing.map((draft) => draft.outputAudioPath))
+      const requestedPaths = new Set(request.drafts.map((draft) => normalizeJobSpec(draft).outputAudioPath))
+      if (existingPaths.size !== requestedPaths.size
+        || Array.from(requestedPaths).some((outputPath) => !existingPaths.has(outputPath))) {
+        throw new Error(`Batch ${request.batchId} already exists with different output files.`)
+      }
+      return existing
+    }
+
+    const created = request.drafts.map((draftInput) => createDraftFromInput({
+      ...normalizeJobSpec(draftInput),
+      batchId: request.batchId,
+      batchSourceName: request.batchSourceName
+    }))
+    const nextDrafts = new Map(drafts)
+    for (const draft of created) {
+      nextDrafts.set(draft.id, draft)
+    }
+    if (request.source?.kind === 'draft') {
+      const sourceDraft = nextDrafts.get(request.source.id)
+      if (sourceDraft) {
+        nextDrafts.set(sourceDraft.id, {
+          ...sourceDraft,
+          batchId: request.batchId,
+          batchSourceName: request.batchSourceName,
+          updatedAt: new Date().toISOString()
+        })
+      }
+    }
+
+    saveDraftCollection(nextDrafts)
+    drafts.clear()
+    for (const [draftId, draft] of nextDrafts) {
+      drafts.set(draftId, draft)
+    }
+
+    if (request.source?.kind === 'runtime') {
+      try {
+        queueManager.tagQueueItemBatch(
+          request.source.id,
+          request.batchId,
+          request.batchSourceName
+        )
+      } catch (error) {
+        log.error('Batch drafts were saved, but tagging the runtime source failed:', error)
+      }
+    }
+    return created
   })
 
   ipcMain.handle('jobs:saveDraft', async (_event, job: JobSpec) => {
@@ -192,9 +341,20 @@ export function setupJobIpcHandlers(): void {
     frozenSpec.id = taskId
     frozenSpec.updatedAt = new Date().toISOString()
     await queueManager.validateJobCanTrain(frozenSpec)
-    queueManager.addToQueue(frozenSpec)
+    beginDraftQueueTransaction({ draftIds: [draftId], queuedJobIds: [frozenSpec.id] })
+    try {
+      queueManager.addToQueue(frozenSpec)
+    } catch (error) {
+      finishDraftQueueTransaction()
+      throw error
+    }
     drafts.delete(draftId)
-    saveDrafts()
+    try {
+      saveDrafts()
+      finishDraftQueueTransaction()
+    } catch (error) {
+      log.error('Queue item is durable; draft cleanup will be recovered on restart:', error)
+    }
     void queueManager.startQueue()
   })
 
@@ -220,12 +380,25 @@ export function setupJobIpcHandlers(): void {
       await queueManager.validateJobCanTrain(entry.spec)
     }
 
+    beginDraftQueueTransaction({
+      draftIds: specsToEnqueue.map((entry) => entry.draftId),
+      queuedJobIds: specsToEnqueue.map((entry) => entry.spec.id)
+    })
+    try {
+      queueManager.addManyToQueue(specsToEnqueue.map((entry) => entry.spec))
+    } catch (error) {
+      finishDraftQueueTransaction()
+      throw error
+    }
     for (const entry of specsToEnqueue) {
-      queueManager.addToQueue(entry.spec)
       drafts.delete(entry.draftId)
     }
-
-    saveDrafts()
+    try {
+      saveDrafts()
+      finishDraftQueueTransaction()
+    } catch (error) {
+      log.error('Queued jobs are durable; draft cleanup will be recovered on restart:', error)
+    }
     void queueManager.startQueue()
   })
 

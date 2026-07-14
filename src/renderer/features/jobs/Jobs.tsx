@@ -657,8 +657,8 @@ export default function Jobs() {
       }
     }
 
-    for (const outputFile of batchEditorState.outputFiles) {
-      const draftInput = buildDraftFromTemplateForOutput({
+    const draftInputs = batchEditorState.outputFiles.map((outputFile) => (
+      buildDraftFromTemplateForOutput({
         template,
         outputAudioPath: outputFile.outputAudioPath,
         outputFileName: outputFile.outputFileName,
@@ -666,18 +666,18 @@ export default function Jobs() {
         batchSourceName,
         useSharedMetadataName: sharedMetadataName.length > 0
       })
-      await window.namBot.jobs.createDraft(draftInput)
-    }
+    ))
 
-    if (batchEditorState.source?.kind === 'draft') {
-      await window.namBot.jobs.saveDraft({
-        ...batchEditorState.source.template,
-        batchId,
-        batchSourceName
-      })
-    } else if (batchEditorState.source?.kind === 'runtime') {
-      await window.namBot.jobs.tagBatchSource(batchEditorState.source.runtimeId, batchId, batchSourceName)
-    }
+    await window.namBot.jobs.createDraftBatch({
+      batchId,
+      batchSourceName,
+      drafts: draftInputs,
+      source: batchEditorState.source?.kind === 'draft'
+        ? { kind: 'draft', id: batchEditorState.source.template.id }
+        : batchEditorState.source?.kind === 'runtime'
+          ? { kind: 'runtime', id: batchEditorState.source.runtimeId }
+          : null
+    })
 
     setBatchEditorState(null)
     await loadData()
@@ -1195,6 +1195,8 @@ function JobEditor({
   const [defaultAudioPath, setDefaultAudioPath] = useState<string | null>(null)
   const [savingDefault, setSavingDefault] = useState(false)
   const [isUnsavedConfirmOpen, setIsUnsavedConfirmOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const saveInFlightRef = useRef(false)
   const settingsDefaultOutputRoot = settings?.defaultOutputRoot?.trim() || null
   const visiblePresets = useMemo(
     () => presets.filter((preset) => preset.visible || preset.id === editedJob.presetId),
@@ -1313,6 +1315,9 @@ function JobEditor({
   const canSave = (allowSaveWithoutChanges || isDirty) && isValid
 
   const performSave = async (): Promise<void> => {
+    if (saveInFlightRef.current) {
+      return
+    }
     if (!isValid) {
       onSessionChange({
         ...session,
@@ -1320,24 +1325,31 @@ function JobEditor({
       })
       return Promise.resolve()
     }
-    if (editedJob.presetId) {
-      window.localStorage.setItem(LAST_USED_PRESET_STORAGE_KEY, editedJob.presetId)
+    saveInFlightRef.current = true
+    setIsSaving(true)
+    try {
+      if (editedJob.presetId) {
+        window.localStorage.setItem(LAST_USED_PRESET_STORAGE_KEY, editedJob.presetId)
+      }
+      window.localStorage.setItem(
+        LAST_APPEND_PRESET_NAME_STORAGE_KEY,
+        editedJob.appendPresetToModelFileName ? 'true' : 'false'
+      )
+      window.localStorage.setItem(
+        LAST_APPEND_ESR_STORAGE_KEY,
+        editedJob.appendEsrToModelFileName ? 'true' : 'false'
+      )
+      window.localStorage.setItem(
+        LAST_COPY_FINAL_MODEL_TO_OUTPUT_AUDIO_FOLDER_STORAGE_KEY,
+        editedJob.copyFinalModelToOutputAudioFolder ? 'true' : 'false'
+      )
+      persistOutputRootPreference(outputRootMode, editedJob.outputRootDir)
+      persistReusableJobDefaults(editedJob, inputMode)
+      await Promise.resolve(onSave(editedJob))
+    } finally {
+      saveInFlightRef.current = false
+      setIsSaving(false)
     }
-    window.localStorage.setItem(
-      LAST_APPEND_PRESET_NAME_STORAGE_KEY,
-      editedJob.appendPresetToModelFileName ? 'true' : 'false'
-    )
-    window.localStorage.setItem(
-      LAST_APPEND_ESR_STORAGE_KEY,
-      editedJob.appendEsrToModelFileName ? 'true' : 'false'
-    )
-    window.localStorage.setItem(
-      LAST_COPY_FINAL_MODEL_TO_OUTPUT_AUDIO_FOLDER_STORAGE_KEY,
-      editedJob.copyFinalModelToOutputAudioFolder ? 'true' : 'false'
-    )
-    persistOutputRootPreference(outputRootMode, editedJob.outputRootDir)
-    persistReusableJobDefaults(editedJob, inputMode)
-    await Promise.resolve(onSave(editedJob))
   }
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -1425,11 +1437,11 @@ function JobEditor({
               type="submit"
               form={JOB_EDITOR_FORM_ID}
               className={`btn btn-sm ${canSave ? 'btn-green' : 'btn-secondary'}`}
-              disabled={!canSave}
+              disabled={!canSave || isSaving}
             >
-              {saveLabel}
+              {isSaving ? 'Saving...' : saveLabel}
             </button>
-            <button type="button" className="btn btn-sm btn-secondary" onClick={handleAttemptExit}>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={handleAttemptExit} disabled={isSaving}>
               Cancel
             </button>
           </div>
@@ -2012,11 +2024,11 @@ function JobEditor({
             <button
               type="submit"
               className={`btn ${canSave ? 'btn-green' : 'btn-secondary'}`}
-              disabled={!canSave}
+              disabled={!canSave || isSaving}
             >
-              {saveLabel}
+              {isSaving ? 'Saving...' : saveLabel}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={handleAttemptExit}>
+            <button type="button" className="btn btn-secondary" onClick={handleAttemptExit} disabled={isSaving}>
               Cancel
             </button>
             {showValidationErrors && !isValid && (

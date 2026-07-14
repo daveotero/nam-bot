@@ -8,6 +8,7 @@ import {
   NamVersionInfo,
   TrainingLaunchCheckResult,
   TrainingLaunchDiagnosticsSummary,
+  shouldAutoLoadResource,
   useAppStore
 } from '../../state/store'
 import { MIN_A2_NAM_VERSION } from '../../state/types'
@@ -1460,9 +1461,14 @@ export default function Diagnostics() {
     trainingLaunchDiagnostics,
     namVersionInfo,
     isLoading,
+    isBackendValidationLoading,
     isAcceleratorDiagnosticsLoading,
     isTrainingLaunchDiagnosticsLoading,
     isNamVersionInfoLoading,
+    validationError,
+    acceleratorDiagnosticsError,
+    trainingLaunchDiagnosticsError,
+    namVersionInfoError,
     loadSettings,
     validateBackend,
     loadAcceleratorDiagnostics,
@@ -1470,7 +1476,13 @@ export default function Diagnostics() {
     loadNamVersionInfo
   } = useAppStore()
 
-  const isChecking = isLoading || isAcceleratorDiagnosticsLoading || isTrainingLaunchDiagnosticsLoading || isNamVersionInfoLoading
+  const isChecking = isLoading || isBackendValidationLoading || isAcceleratorDiagnosticsLoading || isTrainingLaunchDiagnosticsLoading || isNamVersionInfoLoading
+  const diagnosticErrors = [
+    validationError,
+    acceleratorDiagnosticsError,
+    trainingLaunchDiagnosticsError,
+    namVersionInfoError
+  ].filter((message): message is string => Boolean(message))
   const [showAiPrompt, setShowAiPrompt] = useState(false)
   const [showRawJson, setShowRawJson] = useState(false)
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false)
@@ -1490,21 +1502,23 @@ export default function Diagnostics() {
     if (!settings && !isLoading) {
       void loadSettings()
     }
-    if (!validation && !isLoading) {
+    if (shouldAutoLoadResource(validation, isBackendValidationLoading, validationError)) {
       void validateBackend()
     }
-    if (!acceleratorDiagnostics && !isAcceleratorDiagnosticsLoading) {
+    if (shouldAutoLoadResource(acceleratorDiagnostics, isAcceleratorDiagnosticsLoading, acceleratorDiagnosticsError)) {
       void loadAcceleratorDiagnostics()
     }
-    if (!trainingLaunchDiagnostics && !isTrainingLaunchDiagnosticsLoading) {
+    if (shouldAutoLoadResource(trainingLaunchDiagnostics, isTrainingLaunchDiagnosticsLoading, trainingLaunchDiagnosticsError)) {
       void loadTrainingLaunchDiagnostics()
     }
-    if (!namVersionInfo && !isNamVersionInfoLoading) {
+    if (shouldAutoLoadResource(namVersionInfo, isNamVersionInfoLoading, namVersionInfoError)) {
       void loadNamVersionInfo()
     }
   }, [
     acceleratorDiagnostics,
+    acceleratorDiagnosticsError,
     isAcceleratorDiagnosticsLoading,
+    isBackendValidationLoading,
     isLoading,
     isNamVersionInfoLoading,
     isTrainingLaunchDiagnosticsLoading,
@@ -1513,9 +1527,12 @@ export default function Diagnostics() {
     loadSettings,
     loadTrainingLaunchDiagnostics,
     namVersionInfo,
+    namVersionInfoError,
     settings,
     trainingLaunchDiagnostics,
+    trainingLaunchDiagnosticsError,
     validation,
+    validationError,
     validateBackend
   ])
 
@@ -1547,6 +1564,11 @@ export default function Diagnostics() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
           {tiles.map((tile) => <SummaryTileCard key={tile.title} tile={tile} />)}
         </div>
+        {diagnosticErrors.length > 0 && (
+          <div style={{ marginTop: '12px', color: 'var(--neon-magenta)', fontSize: '13px' }}>
+            Diagnostics could not complete: {diagnosticErrors.join(' ')} Use Re-check All to try again.
+          </div>
+        )}
       </div>
 
       <ActionCenter actions={actions} allReady={isSetupReady(validation, acceleratorDiagnostics, trainingLaunchDiagnostics)} onOpenSettings={() => navigate('/settings')} />

@@ -176,6 +176,7 @@ function createAcceleratorDiagnosticsSummary(
     torchImportOk: extras?.torchImportOk ?? null,
     torchVersion: extras?.torchVersion ?? null,
     torchCudaVersion: extras?.torchCudaVersion ?? null,
+    hipVersion: extras?.hipVersion ?? null,
     namVersion: extras?.namVersion ?? null,
     lightningPackage: extras?.lightningPackage ?? null,
     lightningVersion: extras?.lightningVersion ?? null,
@@ -1094,9 +1095,15 @@ export async function validateBackend(settings: AppSettings): Promise<BackendVal
 
 async function runCondaCommand(
   settings: AppSettings,
-  args: string[]
+  args: string[],
+  signal?: AbortSignal
 ): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({ ok: false, output: 'Command canceled' })
+      return
+    }
+
     let proc: ChildProcess
     try {
       proc = spawnCondaProcess(settings, args)
@@ -1110,14 +1117,29 @@ async function runCondaCommand(
     let output = ''
     let errorOutput = ''
     let settled = false
+    let timeout: NodeJS.Timeout | null = null
 
     const settle = (result: { ok: boolean; output: string }): void => {
       if (settled) {
         return
       }
       settled = true
+      if (timeout) {
+        clearTimeout(timeout)
+      }
+      signal?.removeEventListener('abort', handleAbort)
       resolve(result)
     }
+
+    const handleAbort = (): void => {
+      if (settled) {
+        return
+      }
+      forceKillProcessTreeSync(proc)
+      settle({ ok: false, output: 'Command canceled' })
+    }
+
+    signal?.addEventListener('abort', handleAbort, { once: true })
 
     proc.stdout?.on('data', (data: Buffer | string) => {
       output += data.toString()
@@ -1138,7 +1160,7 @@ async function runCondaCommand(
       settle({ ok: false, output: err.message })
     })
 
-    setTimeout(async () => {
+    timeout = setTimeout(async () => {
       if (settled) {
         return
       }
@@ -1151,14 +1173,15 @@ async function runCondaCommand(
 async function runPythonScriptInEnvironment(
   settings: AppSettings,
   script: string,
-  scriptName: string
+  scriptName: string,
+  signal?: AbortSignal
 ): Promise<{ ok: boolean; output: string }> {
   const tempDir = mkdtempSync(join(tmpdir(), 'nam-bot-probe-'))
   const scriptPath = join(tempDir, scriptName)
 
   try {
     writeFileSync(scriptPath, script, 'utf8')
-    return await runCondaCommand(settings, ['python', scriptPath])
+    return await runCondaCommand(settings, ['python', scriptPath], signal)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
@@ -1174,7 +1197,10 @@ function getLightningSecurityCacheKey(settings: AppSettings): string {
   })
 }
 
-async function runLightningPackageSecurityProbe(settings: AppSettings): Promise<LightningSecuritySummary> {
+async function runLightningPackageSecurityProbe(
+  settings: AppSettings,
+  signal?: AbortSignal
+): Promise<LightningSecuritySummary> {
   const script = [
     'import json',
     'from importlib.metadata import PackageNotFoundError, version',
@@ -1195,7 +1221,7 @@ async function runLightningPackageSecurityProbe(settings: AppSettings): Promise<
     `print('${LIGHTNING_SECURITY_PREFIX}' + json.dumps({'packages': packages}))`
   ].join('\n')
 
-  const result = await runPythonScriptInEnvironment(settings, script, 'lightning-security-probe.py')
+  const result = await runPythonScriptInEnvironment(settings, script, 'lightning-security-probe.py', signal)
   const line = result.output
     .split(/\r?\n/)
     .find((entry) => entry.trim().startsWith(LIGHTNING_SECURITY_PREFIX))
@@ -1237,7 +1263,7 @@ async function runLightningPackageSecurityProbe(settings: AppSettings): Promise<
 
 async function inspectLightningPackageSecurity(
   settings: AppSettings,
-  options?: { allowRecentResult?: boolean }
+  options?: { allowRecentResult?: boolean; signal?: AbortSignal }
 ): Promise<LightningSecuritySummary> {
   const cacheKey = getLightningSecurityCacheKey(settings)
   const allowRecentResult = options?.allowRecentResult ?? true
@@ -1245,6 +1271,14 @@ async function inspectLightningPackageSecurity(
   if (allowRecentResult && recentResult && Date.now() - recentResult.checkedAt < LIGHTNING_SECURITY_RECENT_RESULT_TTL_MS) {
     log.info('Reusing recent Lightning security probe result')
     return recentResult.summary
+  }
+
+  if (options?.signal) {
+    const summary = await runLightningPackageSecurityProbe(settings, options.signal)
+    if (!options.signal.aborted) {
+      lightningSecurityRecentResults.set(cacheKey, { checkedAt: Date.now(), summary })
+    }
+    return summary
   }
 
   const inFlight = lightningSecurityInFlight.get(cacheKey)
@@ -1265,8 +1299,13 @@ async function inspectLightningPackageSecurity(
   return probe
 }
 
-async function assertLightningPackageSafe(settings: AppSettings): Promise<void> {
-  const lightningSecurity = await inspectLightningPackageSecurity(settings, { allowRecentResult: false })
+async function assertLightningPackageSafe(settings: AppSettings, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  const lightningSecurity = await inspectLightningPackageSecurity(settings, {
+    allowRecentResult: false,
+    signal
+  })
+  signal?.throwIfAborted()
   if (!lightningSecurity.ok) {
     throw new Error('NAM-BOT could not verify Lightning package versions safely. Verify package metadata manually before running NAM commands in this environment.')
   }
@@ -1277,7 +1316,10 @@ async function assertLightningPackageSafe(settings: AppSettings): Promise<void> 
   }
 }
 
-export async function inspectTorchRuntime(settings: AppSettings): Promise<TorchRuntimeSummary | null> {
+export async function inspectTorchRuntime(
+  settings: AppSettings,
+  signal?: AbortSignal
+): Promise<TorchRuntimeSummary | null> {
   const script = [
     'import json',
     'import torch',
@@ -1293,7 +1335,8 @@ export async function inspectTorchRuntime(settings: AppSettings): Promise<TorchR
     "print('NAM_BOT_TORCH=' + json.dumps(payload))"
   ].join('\n')
 
-  const result = await runPythonScriptInEnvironment(settings, script, 'torch-runtime-probe.py')
+  const result = await runPythonScriptInEnvironment(settings, script, 'torch-runtime-probe.py', signal)
+  signal?.throwIfAborted()
   if (!result.ok && !result.output.includes('NAM_BOT_TORCH=')) {
     return null
   }
@@ -2228,17 +2271,21 @@ function buildNamLatencyAnalysisScript(inputPath: string, outputPath: string): s
 export async function analyzeNamLatency(
   settings: AppSettings,
   inputPath: string,
-  outputPath: string
+  outputPath: string,
+  signal?: AbortSignal
 ): Promise<NamLatencyAnalysisResult> {
   try {
-    await assertLightningPackageSafe(settings)
+    await assertLightningPackageSafe(settings, signal)
   } catch (error) {
+    signal?.throwIfAborted()
     const message = error instanceof Error ? error.message : 'Lightning package security check failed'
     return createFailedLatencyAnalysis('', message)
   }
 
   const script = buildNamLatencyAnalysisScript(inputPath, outputPath)
-  const result = await runPythonScriptInEnvironment(settings, script, 'latency-analysis.py')
+  signal?.throwIfAborted()
+  const result = await runPythonScriptInEnvironment(settings, script, 'latency-analysis.py', signal)
+  signal?.throwIfAborted()
   const parsed = parseNamLatencyAnalysisOutput(result.output)
 
   if (!result.ok && !parsed.errorMessage) {
@@ -2259,9 +2306,11 @@ export async function runNamFull(
     noPlots?: boolean
     cwd?: string
   },
-  hooks: RunHooks
+  hooks: RunHooks,
+  signal?: AbortSignal
 ): Promise<TrainingProcessController> {
-  await assertLightningPackageSafe(settings)
+  await assertLightningPackageSafe(settings, signal)
+  signal?.throwIfAborted()
 
   return new Promise((resolve, reject) => {
     const namArgs = [
@@ -2300,8 +2349,15 @@ export async function runNamFull(
     })
 
     pty.onExit(({ exitCode }) => {
+      signal?.removeEventListener('abort', handleAbort)
       hooks.onExit(exitCode)
     })
+
+    const handleAbort = (): void => {
+      forceKillPtyProcessTreeSync(pty)
+    }
+
+    signal?.addEventListener('abort', handleAbort, { once: true })
 
     resolve({
       cancel: () => {

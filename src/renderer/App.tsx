@@ -9,6 +9,7 @@ import {
   type JobEditorSession,
   type PresetEditorSession,
   TrainingLaunchDiagnosticsSummary,
+  shouldAutoLoadResource,
   useAppStore
 } from './state/store'
 import type { UpdateStatus } from '../shared/update'
@@ -246,9 +247,14 @@ function Dashboard() {
     trainingLaunchDiagnostics,
     namVersionInfo,
     isLoading,
+    isBackendValidationLoading,
     isAcceleratorDiagnosticsLoading,
     isTrainingLaunchDiagnosticsLoading,
     isNamVersionInfoLoading,
+    validationError,
+    acceleratorDiagnosticsError,
+    trainingLaunchDiagnosticsError,
+    namVersionInfoError,
     validateBackend,
     loadAcceleratorDiagnostics, 
     loadTrainingLaunchDiagnostics,
@@ -290,16 +296,16 @@ function Dashboard() {
   }, [trainingJobs.length])
 
   useEffect(() => {
-    if (!validation && !isLoading) {
+    if (shouldAutoLoadResource(validation, isBackendValidationLoading, validationError)) {
       void validateBackend()
     }
-    if (!acceleratorDiagnostics && !isAcceleratorDiagnosticsLoading) {
+    if (shouldAutoLoadResource(acceleratorDiagnostics, isAcceleratorDiagnosticsLoading, acceleratorDiagnosticsError)) {
       void loadAcceleratorDiagnostics()
     }
-    if (!trainingLaunchDiagnostics && !isTrainingLaunchDiagnosticsLoading) {
+    if (shouldAutoLoadResource(trainingLaunchDiagnostics, isTrainingLaunchDiagnosticsLoading, trainingLaunchDiagnosticsError)) {
       void loadTrainingLaunchDiagnostics()
     }
-    if (!namVersionInfo && !isNamVersionInfoLoading) {
+    if (shouldAutoLoadResource(namVersionInfo, isNamVersionInfoLoading, namVersionInfoError)) {
       void loadNamVersionInfo()
     }
     if (presets.length === 0) {
@@ -307,7 +313,9 @@ function Dashboard() {
     }
   }, [
     acceleratorDiagnostics,
+    acceleratorDiagnosticsError,
     isAcceleratorDiagnosticsLoading,
+    isBackendValidationLoading,
     isLoading,
     isNamVersionInfoLoading,
     isTrainingLaunchDiagnosticsLoading,
@@ -316,9 +324,12 @@ function Dashboard() {
     loadPresets,
     loadTrainingLaunchDiagnostics,
     namVersionInfo,
+    namVersionInfoError,
     presets.length,
     trainingLaunchDiagnostics,
+    trainingLaunchDiagnosticsError,
     validation,
+    validationError,
     validateBackend
   ])
 
@@ -478,6 +489,7 @@ function AppShell() {
   const [pendingAction, setPendingAction] = useState<PendingAppAction | null>(null)
   const { isTraining } = useAppStore()
   const isLoading = useAppStore((state) => state.isLoading)
+  const isBackendValidationLoading = useAppStore((state) => state.isBackendValidationLoading)
   const isAcceleratorDiagnosticsLoading = useAppStore((state) => state.isAcceleratorDiagnosticsLoading)
   const isTrainingLaunchDiagnosticsLoading = useAppStore((state) => state.isTrainingLaunchDiagnosticsLoading)
   const isNamVersionInfoLoading = useAppStore((state) => state.isNamVersionInfoLoading)
@@ -499,6 +511,7 @@ function AppShell() {
   const subscribeToJobEvents = useAppStore((state) => state.subscribeToJobEvents)
   const hasUpdateAvailable = updateStatus.state === 'update-available'
   const isDiagnosticsChecking = isLoading
+    || isBackendValidationLoading
     || isAcceleratorDiagnosticsLoading
     || isTrainingLaunchDiagnosticsLoading
     || isNamVersionInfoLoading

@@ -68,6 +68,7 @@ Drafts are where users can iterate safely before they commit a run to the queue.
 - if the batch editor's shared metadata model name is left blank, each generated model uses its output filename; if a shared metadata model name is typed, every generated draft uses that value
 - the template draft, generated drafts, and their later training/finished cards show a `Batch: <template name>` badge for traceability
 - generated drafts are still normal drafts and can be edited independently before queueing
+- all generated drafts are created through one idempotent `jobs:createDraftBatch` operation, so double submission or retry after an interrupted response does not create a partial or duplicate batch
 
 Shared fields copied from the template include:
 
@@ -319,7 +320,9 @@ For queued runs that share the same output root:
 
 - NAM-BOT binds each active run to the timestamped output folder whose folder name time matches that run's start window
 - root-level fallback is only used when fresh training artifacts exist directly in the output root itself
+- NAM-BOT snapshots pre-existing artifacts before launch and ignores unchanged files from that baseline, including recent root-level models
 - this keeps each queued job's log, ESR tracking, and final `.nam` artifact bound to the correct training run even when previous run folders are touched during finalization
+- failed and canceled runs may retain logs and checkpoint diagnostics, but only a successful run with a final `.nam` file can rename, enrich, copy, or publish that model
 
 ### Job Status Values
 
@@ -339,6 +342,10 @@ Stop requests use two modes:
 
 - `graceful`
 - `force`
+
+Stop and application-quit requests cover the complete run lifecycle. During `preparing`, NAM-BOT cancels latency, Lightning, Torch, and other environment subprocesses; after the training PTY starts, the same request controls the full training process tree.
+
+Each run also captures one immutable backend-settings snapshot before preparation. Settings changes made while a job is preparing or running apply to later jobs, not the active run.
 
 ## What The Editor Fields Drive
 
@@ -406,6 +413,8 @@ When a draft is enqueued:
 
 This prevents a user from accidentally changing the meaning of an already queued run.
 
+Queue persistence completes before the draft is removed. A small recovery marker bridges the queue and draft files so a crash between those writes cannot delete the only durable copy of a job.
+
 ### A2 Version Gate
 
 NAM-BOT now defaults to local A2 training through the `a2-packed-wavenet` preset. A2 requires `neural-amp-modeler>=0.13.0` because earlier local `nam-full` installs do not include the required PackedWaveNet training path.
@@ -432,6 +441,8 @@ Saved draft jobs are persisted in the Electron user data folder:
 - Windows: `%APPDATA%\\NAM-BOT\\drafts.json`
 
 This file stores the editable draft list, not the currently open unsaved editor session.
+
+Draft and queue JSON files use atomic replacement and retain a `.bak` recovery copy. Preset, Settings, and update-status persistence use the same storage primitive.
 
 ### Queue Storage
 

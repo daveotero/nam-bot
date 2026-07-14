@@ -1,5 +1,18 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, powerSaveBlocker, shell, type NativeImage } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  Notification,
+  powerSaveBlocker,
+  shell,
+  type MessageBoxOptions,
+  type MessageBoxReturnValue,
+  type NativeImage
+} from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import log from 'electron-log/main'
 import { existsSync, mkdirSync } from 'fs'
 import { setupIpcHandlers, validateBackendOnStartup } from './ipc/settings'
@@ -70,6 +83,12 @@ let allowUnsafeClose = false
 let trainingPowerSaveBlockerId: number | null = null
 const reportedFinishedStatuses: Map<string, JobStatus> = new Map()
 const reportedDiagnosticBlocks: Set<string> = new Set()
+
+function showMainMessageBox(options: MessageBoxOptions): Promise<MessageBoxReturnValue> {
+  return mainWindow
+    ? dialog.showMessageBox(mainWindow, options)
+    : dialog.showMessageBox(options)
+}
 
 app.setAppUserModelId(APP_ID)
 
@@ -159,7 +178,7 @@ function stopTrainingPowerSaveBlocker(): void {
 }
 
 async function showAboutDialog(): Promise<void> {
-  const result = await dialog.showMessageBox(mainWindow ?? undefined, {
+  const result = await showMainMessageBox({
     type: 'info',
     title: 'About NAM-BOT',
     message: `NAM-BOT ${app.getVersion()}`,
@@ -184,7 +203,7 @@ async function showManualUpdateCheckDialog(): Promise<void> {
     const status = await checkForUpdatesNow()
 
     if (status.state === 'update-available' && status.latestVersion) {
-      const result = await dialog.showMessageBox(mainWindow ?? undefined, {
+      const result = await showMainMessageBox({
         type: 'info',
         title: 'Update Available',
         message: `NAM-BOT ${status.latestVersion} is available.`,
@@ -202,7 +221,7 @@ async function showManualUpdateCheckDialog(): Promise<void> {
     }
 
     if (status.state === 'up-to-date') {
-      await dialog.showMessageBox(mainWindow ?? undefined, {
+      await showMainMessageBox({
         type: 'info',
         title: 'No Updates Available',
         message: `NAM-BOT ${status.currentVersion} is up to date.`,
@@ -216,7 +235,7 @@ async function showManualUpdateCheckDialog(): Promise<void> {
       return
     }
 
-    await dialog.showMessageBox(mainWindow ?? undefined, {
+    await showMainMessageBox({
       type: 'warning',
       title: 'Update Check Failed',
       message: 'NAM-BOT could not confirm the latest release right now.',
@@ -227,7 +246,7 @@ async function showManualUpdateCheckDialog(): Promise<void> {
     })
   } catch (error) {
     log.error('Manual update dialog flow failed:', error)
-    await dialog.showMessageBox(mainWindow ?? undefined, {
+    await showMainMessageBox({
       type: 'error',
       title: 'Update Check Failed',
       message: 'NAM-BOT could not complete the manual update check.',
@@ -351,6 +370,8 @@ function setupShellIntegrations(): void {
 function createWindow(): void {
   log.info('Creating main window...')
   const windowIcon = resolveWindowIcon()
+  const bundledRendererPath = join(__dirname, '../renderer/index.html')
+  const bundledRendererUrl = pathToFileURL(bundledRendererPath)
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -364,7 +385,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   })
 
@@ -377,9 +398,50 @@ function createWindow(): void {
     updateWindowProgress()
   })
 
+  const trustedExternalHosts = new Set([
+    'github.com',
+    'daveotero.com',
+    'flatlineaudio.com',
+    'ko-fi.com',
+    'www.anaconda.com',
+    'pytorch.org',
+    'www.pytorch.org'
+  ])
+  const isTrustedRendererUrl = (targetUrl: string): boolean => {
+    try {
+      const parsedUrl = new URL(targetUrl)
+      if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+        return parsedUrl.origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+      }
+      return parsedUrl.protocol === 'file:' && parsedUrl.pathname === bundledRendererUrl.pathname
+    } catch {
+      return false
+    }
+  }
+
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) {
+      event.preventDefault()
+      log.warn('Blocked unexpected renderer navigation:', targetUrl)
+    }
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const targetUrl = new URL(details.url)
+      if (targetUrl.protocol === 'https:' && trustedExternalHosts.has(targetUrl.hostname)) {
+        void shell.openExternal(targetUrl.toString())
+      } else {
+        log.warn('Blocked untrusted external URL:', details.url)
+      }
+    } catch {
+      log.warn('Blocked malformed external URL:', details.url)
+    }
     return { action: 'deny' }
+  })
+
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false)
   })
 
   mainWindow.on('close', (event) => {
@@ -388,7 +450,7 @@ function createWindow(): void {
     }
 
     event.preventDefault()
-    void dialog.showMessageBox(mainWindow ?? undefined, {
+    void showMainMessageBox({
       type: 'warning',
       title: 'Training is still running',
       message: 'Closing NAM-BOT right now will force-stop the active training job.',
@@ -412,7 +474,7 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     log.info('Loading production build')
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(bundledRendererPath)
   }
 
   mainWindow.webContents.once('did-finish-load', () => {

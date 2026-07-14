@@ -1,6 +1,6 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from 'fs'
+import { basename, join, resolve, sep } from 'path'
 import log from 'electron-log/main'
 import {
   DEFAULT_PRESET_ID,
@@ -11,6 +11,7 @@ import {
   normalizeTrainingPreset,
   slugifyPresetName
 } from '../types/jobs'
+import { atomicWriteJsonSync } from './atomicFile'
 
 const userPresetsPath = join(app.getPath('userData'), 'presets')
 
@@ -40,7 +41,16 @@ function ensurePresetDirectory(): void {
 }
 
 function getPresetFilePath(presetId: string): string {
-  return join(userPresetsPath, `${presetId}.json`)
+  if (!/^[a-z0-9][a-z0-9_-]{0,127}$/i.test(presetId)) {
+    throw new Error('Preset ID must contain only letters, numbers, underscores, and hyphens.')
+  }
+
+  const targetPath = resolve(userPresetsPath, `${presetId}.json`)
+  const presetRoot = `${resolve(userPresetsPath)}${sep}`
+  if (!targetPath.startsWith(presetRoot) || basename(targetPath) !== `${presetId}.json`) {
+    throw new Error('Preset path must remain inside the preset directory.')
+  }
+  return targetPath
 }
 
 function listUserPresetsInternal(): TrainingPresetFile[] {
@@ -162,7 +172,7 @@ export function saveTrainingPreset(input: unknown): TrainingPresetFile {
     updatedAt: new Date().toISOString(),
     origin: buildStoredPresetOrigin(preset)
   })
-  writeFileSync(getPresetFilePath(normalized.id), JSON.stringify(normalized, null, 2), 'utf-8')
+  atomicWriteJsonSync(getPresetFilePath(normalized.id), normalized)
   return normalized
 }
 

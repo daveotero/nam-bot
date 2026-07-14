@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactElement } from 'react'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -30,7 +30,7 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
   onAlternate
-}: ConfirmDialogProps): JSX.Element | null {
+}: ConfirmDialogProps): ReactElement | null {
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {

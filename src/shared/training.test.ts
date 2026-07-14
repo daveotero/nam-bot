@@ -31,6 +31,7 @@ function buildTestJobSpec(): JobSpec {
     presetId: 'legacy-custom-preset',
     appendPresetToModelFileName: false,
     appendEsrToModelFileName: false,
+    copyFinalModelToOutputAudioFolder: false,
     inputAudioPath: 'C:\\input.wav',
     inputAudioIsDefault: false,
     outputAudioPath: 'C:\\output.wav',

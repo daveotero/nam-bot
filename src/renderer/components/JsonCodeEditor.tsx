@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, type ClipboardEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type ClipboardEvent,
+  type ComponentProps,
+  type ReactElement
+} from 'react'
 import CodeEditor from '@uiw/react-textarea-code-editor'
 import rehypePrism from 'rehype-prism-plus'
 import '@uiw/react-textarea-code-editor/dist.css'
@@ -22,7 +29,9 @@ interface JsonCodeEditorProps {
   onPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void
 }
 
-const JSON_EDITOR_REHYPE_PLUGINS = [[rehypePrism, { ignoreMissing: true, showLineNumbers: true }]]
+const JSON_EDITOR_REHYPE_PLUGINS: NonNullable<ComponentProps<typeof CodeEditor>['rehypePlugins']> = [
+  [rehypePrism, { ignoreMissing: true, showLineNumbers: true }]
+]
 
 export default function JsonCodeEditor({
   id,
@@ -35,7 +44,7 @@ export default function JsonCodeEditor({
   minHeight = 180,
   onFormat,
   onPaste
-}: JsonCodeEditorProps): JSX.Element {
+}: JsonCodeEditorProps): ReactElement {
   const editorRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {

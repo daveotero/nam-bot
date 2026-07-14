@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PREVIEW_RETENTION_COUNT: 10
@@ -35,10 +35,36 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "preview_tag=$PREVIEW_TAG" >> "$GITHUB_OUTPUT"
 
+  quality:
+    name: Typecheck and Test Preview
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck application and tests
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
   build-windows:
     name: Build Windows Preview
     runs-on: windows-2022
-    needs: prepare
+    needs:
+      - prepare
+      - quality
 
     steps:
       - name: Check out repository
@@ -79,7 +105,9 @@ jobs:
   build-macos:
     name: Build macOS Preview
     runs-on: macos-14
-    needs: prepare
+    needs:
+      - prepare
+      - quality
 
     steps:
       - name: Check out repository
@@ -119,6 +147,8 @@ jobs:
       - prepare
       - build-windows
       - build-macos
+    permissions:
+      contents: write
 
     steps:
       - name: Check out repository

@@ -7,13 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-13
+
+### Added
+
+- Added atomic JSON persistence with recoverable backups, transactional draft-to-queue recovery, and regression coverage for persistence and preset path safety.
+
 ### Changed
 
 - Failed and stopped training cards now prioritize `Create Draft` so users can edit settings before queueing another run.
+- Settings now expose explicit dirty, saving, saved, and error states, flush pending changes during navigation, and validate the exact saved settings snapshot.
+- CI, preview, and release builds now require TypeScript checks and the Vitest suite before platform packaging, with least-privilege workflow permissions.
+- Electron now uses renderer sandboxing, exact production navigation checks, denied permission requests, and an HTTPS host allowlist for external links.
 
 ### Fixed
 
 - Auto-align preflight feedback now appears in the same terminal log as training, and expanded job details show the latency mode and actual delay used for the run.
+- Training jobs now claim only artifacts created or changed during their own run, and failed, canceled, or zero-exit runs without a new model can no longer publish an older or partial model as successful.
+- Workspace setup failures now terminate cleanly, and Stop, Force Stop, and shutdown cancel latency analysis and other preparation subprocesses as well as active training.
+- Each training run now uses one immutable backend-settings snapshot from validation through process launch.
+- Queue and batch persistence failures no longer delete the only durable draft copy; batch draft creation is atomic, idempotent, and guarded against duplicate submissions.
+- User preset IDs can no longer traverse outside the preset directory.
+- Diagnostic failures no longer trigger unbounded automatic IPC retries, and stale results are discarded after settings changes.
+- TypeScript project boundaries and previously hidden source errors are fixed so production and test code are checked consistently.
 
 ## [0.6.2] - 2026-07-02
 

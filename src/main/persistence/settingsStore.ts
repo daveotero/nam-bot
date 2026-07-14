@@ -1,8 +1,9 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import log from 'electron-log/main'
 import { AppSettings, defaultSettings } from '../types'
+import { atomicWriteJsonSync, readJsonWithBackupSync } from './atomicFile'
 
 const userDataPath = app.getPath('userData')
 const settingsPath = join(userDataPath, 'settings.json')
@@ -23,8 +24,7 @@ function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppS
 export function loadSettings(): AppSettings {
   try {
     if (existsSync(settingsPath)) {
-      const data = readFileSync(settingsPath, 'utf-8')
-      const parsed = JSON.parse(data) as Partial<AppSettings>
+      const parsed = readJsonWithBackupSync(settingsPath) as Partial<AppSettings>
       log.info('Settings loaded from:', settingsPath)
       return normalizeSettings(parsed)
     }
@@ -41,7 +41,7 @@ export function saveSettings(settings: AppSettings): void {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
     }
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+    atomicWriteJsonSync(settingsPath, settings)
     log.info('Settings saved to:', settingsPath)
   } catch (error) {
     log.error('Failed to save settings:', error)

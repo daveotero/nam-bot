@@ -4,10 +4,13 @@ The Settings page manages global configuration for NAM-BOT, including backend pa
 
 ## Auto-save Behavior
 
-Settings in NAM-BOT are **automatically saved** as you type. There is no manual "Save" button.
+Settings in NAM-BOT are automatically saved after a short pause, and the header also provides an explicit **Save Settings** button.
 
-- A short debounce (approx. 1 second) is applied to prevent constant disk writes while typing.
-- Backend configuration changes (like Conda or Python paths) are saved immediately, but **validation** of these paths must be triggered manually using the "Validate Backend" button.
+- A short debounce (approximately 500 ms) prevents constant disk writes while typing.
+- Navigating away flushes the current settings draft instead of canceling the pending save.
+- The header reports `Unsaved changes`, `Saving`, `Saved`, or a visible save error.
+- **Validate Backend** first saves the exact settings shown on screen, then validates that saved snapshot.
+- Changing backend settings invalidates earlier backend, accelerator, launch, and NAM-version results so a stale `Backend Ready` result is not displayed for the new target.
 
 ## Configuration Categories
 
