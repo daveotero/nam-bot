@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 import type { AppCommand } from '../shared/appShell'
+import type { LogChunk } from '../shared/logs'
 import type { UpdateStatus } from '../shared/update'
 
 export interface NamBotApi {
@@ -15,7 +16,6 @@ export interface NamBotApi {
     getNamVersionInfo: () => Promise<unknown>
     chooseCondaPath: () => Promise<string | null>
     chooseDirectory: () => Promise<string | null>
-    choosePythonPath: () => Promise<string | null>
   }
   jobs: {
     createDraft: (input?: unknown) => Promise<unknown>
@@ -54,6 +54,7 @@ export interface NamBotApi {
   }
   logs: {
     getTerminal: (jobId: string) => Promise<string>
+    getTerminalChunk: (jobId: string, offset: number | null) => Promise<LogChunk>
     getDiagnostics: () => Promise<string>
   }
   updates: {
@@ -81,8 +82,7 @@ const api: NamBotApi = {
     getTrainingLaunchDiagnostics: () => ipcRenderer.invoke('settings:getTrainingLaunchDiagnostics'),
     getNamVersionInfo: () => ipcRenderer.invoke('settings:getNamVersionInfo'),
     chooseCondaPath: () => ipcRenderer.invoke('settings:chooseCondaPath'),
-    chooseDirectory: () => ipcRenderer.invoke('settings:chooseDirectory'),
-    choosePythonPath: () => ipcRenderer.invoke('settings:choosePythonPath')
+    chooseDirectory: () => ipcRenderer.invoke('settings:chooseDirectory')
   },
   jobs: {
     createDraft: (input) => ipcRenderer.invoke('jobs:createDraft', input),
@@ -121,6 +121,7 @@ const api: NamBotApi = {
   },
   logs: {
     getTerminal: (jobId) => ipcRenderer.invoke('logs:getTerminal', jobId),
+    getTerminalChunk: (jobId, offset) => ipcRenderer.invoke('logs:getTerminalChunk', jobId, offset),
     getDiagnostics: () => ipcRenderer.invoke('logs:getDiagnostics')
   },
   updates: {

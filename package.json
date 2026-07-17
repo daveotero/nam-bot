@@ -1,12 +1,12 @@
 {
   "name": "nam-bot",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Neural Amp Modeler Training Manager",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "test": "vitest run",
+    "test": "vitest run && node --test build/release-metadata.test.cjs",
     "typecheck": "tsc -p tsconfig.node.json --pretty false && tsc -p tsconfig.web.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "check": "npm run typecheck && npm test && npm run build",
     "preview": "electron-vite preview",
@@ -43,12 +43,12 @@
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.1.4",
-    "electron": "^40.8.0",
+    "electron": "^40.10.6",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "vitest": "^3.2.4"
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",
@@ -60,9 +60,9 @@
     "node-pty": "^1.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.18.1",
     "rehype-prism-plus": "^2.0.2",
-    "uuid": "^13.0.0",
+    "uuid": "^13.0.2",
     "zustand": "^5.0.11"
   }
 }

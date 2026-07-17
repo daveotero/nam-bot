@@ -16,7 +16,8 @@ jobs:
     name: Prepare Preview Metadata
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
+      base_version: ${{ steps.meta.outputs.base_version }}
+      version: ${{ steps.meta.outputs.preview_version }}
       short_sha: ${{ steps.meta.outputs.short_sha }}
       preview_tag: ${{ steps.meta.outputs.preview_tag }}
 
@@ -24,16 +25,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       - name: Compute preview identifiers
         id: meta
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          SHORT_SHA="${GITHUB_SHA::7}"
-          PREVIEW_TAG="preview-main-${SHORT_SHA}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "preview_tag=$PREVIEW_TAG" >> "$GITHUB_OUTPUT"
+        run: node build/release-metadata.cjs preview
 
   quality:
     name: Typecheck and Test Preview
@@ -79,6 +78,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Stamp unique preview version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
+
       - name: Build production app
         run: npm run build
 
@@ -89,8 +91,7 @@ jobs:
         shell: powershell
         run: |
           $previewVersion = '${{ needs.prepare.outputs.version }}'
-          $shortSha = '${{ needs.prepare.outputs.short_sha }}'
-          $portableAsset = "release\NAM-BOT-Portable-$previewVersion-preview-$shortSha-Win64.zip"
+          $portableAsset = "release\NAM-BOT-Portable-$previewVersion-Win64.zip"
           Compress-Archive -Path 'release\win-unpacked\*' -DestinationPath $portableAsset -Force
 
       - name: Upload Windows preview artifacts
@@ -121,6 +122,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Stamp unique preview version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Build production app
         run: npm run build

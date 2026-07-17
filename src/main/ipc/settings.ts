@@ -43,10 +43,10 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('settings:save', async (_event, settings: AppSettings) => {
     try {
-      saveSettings(settings)
-      cachedSettings = settings
+      const normalizedSettings = saveSettings(settings)
+      cachedSettings = normalizedSettings
       // Keep queue runner in sync with latest settings without requiring restart.
-      getQueueManager().setSettings(settings)
+      getQueueManager().setSettings(normalizedSettings)
       log.info('Settings saved')
     } catch (error) {
       log.error('Failed to save settings:', error)
@@ -138,22 +138,6 @@ export function setupIpcHandlers(): void {
     const result = await dialog.showOpenDialog({
       title: 'Select Directory',
       properties: ['openDirectory', 'createDirectory']
-    })
-    
-    if (result.canceled || result.filePaths.length === 0) {
-      return null
-    }
-    
-    return result.filePaths[0]
-  })
-
-  ipcMain.handle('settings:choosePythonPath', async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Select Python Executable',
-      properties: ['openFile'],
-      filters: process.platform === 'win32'
-        ? [{ name: 'Python', extensions: ['exe'] }, { name: 'All Files', extensions: ['*'] }]
-        : [{ name: 'All Files', extensions: ['*'] }]
     })
     
     if (result.canceled || result.filePaths.length === 0) {

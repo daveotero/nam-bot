@@ -21,6 +21,10 @@ jobs:
   quality:
     name: Typecheck and Test Release
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release_metadata.outputs.version }}
+      release_tag: ${{ steps.release_metadata.outputs.release_tag }}
+      prerelease: ${{ steps.release_metadata.outputs.prerelease }}
 
     steps:
       - name: Check out repository
@@ -33,6 +37,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Validate release tag, package version, and changelog
+        id: release_metadata
+        run: node build/release-metadata.cjs release
 
       - name: Install dependencies
         run: npm ci
@@ -72,7 +80,7 @@ jobs:
       - name: Compress portable app
         shell: powershell
         run: |
-          $releaseVersion = $env:RELEASE_TAG.TrimStart('v')
+          $releaseVersion = '${{ needs.quality.outputs.version }}'
           $portableAsset = "release\\NAM-BOT-Portable-$releaseVersion-Win64.zip"
           Compress-Archive -Path 'release\win-unpacked\*' -DestinationPath $portableAsset -Force
 
@@ -127,6 +135,7 @@ jobs:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs:
+      - quality
       - release-windows
       - release-macos
     permissions:
@@ -189,18 +198,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+          RELEASE_IS_PRERELEASE: ${{ needs.quality.outputs.prerelease }}
         shell: bash
         run: |
+          if [ "$RELEASE_IS_PRERELEASE" = "true" ]; then
+            RELEASE_FLAGS=(--prerelease --latest=false)
+          else
+            RELEASE_FLAGS=(--prerelease=false --latest)
+          fi
+
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TAG" \
-              --notes-file "$RELEASE_NOTES_FILE"
+              --notes-file "$RELEASE_NOTES_FILE" \
+              "${RELEASE_FLAGS[@]}"
           else
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TAG" \
-              --notes-file "$RELEASE_NOTES_FILE"
+              --notes-file "$RELEASE_NOTES_FILE" \
+              --verify-tag \
+              "${RELEASE_FLAGS[@]}"
           fi
 
       - name: Upload Windows assets to GitHub Release

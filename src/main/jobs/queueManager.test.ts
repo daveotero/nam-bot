@@ -142,7 +142,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -204,7 +204,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -230,6 +230,42 @@ describe('QueueManager A2 diagnostics gate', () => {
     expect(terminalLog).toContain('[NAM-BOT] Auto-aligning input/output latency with the NAM analyzer...')
     expect(terminalLog).toContain('[NAM-BOT] Auto-aligned latency using NAM input 3.0.0: 42 samples.')
     expect(terminalLog).toContain('training started')
+  })
+
+  it('coalesces bursts of terminal progress into bounded renderer updates', async () => {
+    const queueManager = createQueueManager()
+    queueManager.setKnownNamVersion(defaultSettings, '0.13.0')
+    queueManager.addToQueue(buildJobSpec())
+    let captureBurstUpdates = false
+    let burstUpdateCount = 0
+    queueManager.on('jobUpdated', () => {
+      if (captureBurstUpdates) {
+        burstUpdateCount += 1
+      }
+    })
+
+    runNamFullMock.mockImplementation(async (_settings, args, hooks) => {
+      hooks.onStarted(1234)
+      captureBurstUpdates = true
+      for (let index = 0; index < 100; index += 1) {
+        hooks.onTerminalData(`progress update ${index}\n`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 350))
+      captureBurstUpdates = false
+      mkdirSync(args.outputRootDir, { recursive: true })
+      writeNamModel(join(args.outputRootDir, 'model.nam'))
+      hooks.onExit(0)
+      return {
+        cancel: vi.fn(),
+        forceKill: vi.fn(async () => true),
+        forceKillSync: vi.fn()
+      }
+    })
+
+    await queueManager.startQueue()
+
+    expect(burstUpdateCount).toBe(1)
+    expect(queueManager.getQueue()[0]?.status).toBe('succeeded')
   })
 
   it('copies the finalized model beside the output audio when requested', async () => {
@@ -263,7 +299,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -298,7 +334,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(1)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -327,7 +363,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -356,7 +392,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })
@@ -401,6 +437,64 @@ describe('QueueManager A2 diagnostics gate', () => {
     expect(queueManager.getCurrentJob()).toBeNull()
   })
 
+  it('finalizes a force-stopped job even when the PTY never emits an exit event', async () => {
+    const queueManager = createQueueManager()
+    queueManager.setKnownNamVersion(defaultSettings, '0.13.0')
+    const job = buildJobSpec()
+    const forceKill = vi.fn(async () => true)
+    queueManager.addToQueue(job)
+    runNamFullMock.mockImplementation(async (_settings, _args, hooks) => {
+      hooks.onStarted(1234)
+      return {
+        cancel: vi.fn(),
+        forceKill,
+        forceKillSync: vi.fn()
+      }
+    })
+
+    const queuePromise = queueManager.startQueue()
+    await vi.waitFor(() => {
+      expect(queueManager.getCurrentJob()?.status).toBe('running')
+    })
+    await queueManager.forceStopJob(job.id)
+    await queuePromise
+
+    const [runtime] = queueManager.getQueue()
+    expect(forceKill).toHaveBeenCalledTimes(1)
+    expect(runtime.status).toBe('canceled')
+    expect(runtime.errorCategory).toBe('force_stopped')
+    expect(runtime.pid).toBeNull()
+    expect(queueManager.getCurrentJob()).toBeNull()
+  })
+
+  it('reports a terminal failure when process-tree termination cannot be confirmed', async () => {
+    const queueManager = createQueueManager()
+    queueManager.setKnownNamVersion(defaultSettings, '0.13.0')
+    const job = buildJobSpec()
+    queueManager.addToQueue(job)
+    runNamFullMock.mockImplementation(async (_settings, _args, hooks) => {
+      hooks.onStarted(1234)
+      return {
+        cancel: vi.fn(),
+        forceKill: vi.fn(async () => false),
+        forceKillSync: vi.fn()
+      }
+    })
+
+    const queuePromise = queueManager.startQueue()
+    await vi.waitFor(() => {
+      expect(queueManager.getCurrentJob()?.status).toBe('running')
+    })
+    await queueManager.forceStopJob(job.id)
+    await queuePromise
+
+    const [runtime] = queueManager.getQueue()
+    expect(runtime.status).toBe('failed')
+    expect(runtime.errorCategory).toBe('force_stop_failed')
+    expect(runtime.userMessages.at(-1)).toContain('Task Manager')
+    expect(queueManager.getCurrentJob()).toBeNull()
+  })
+
   it('uses one immutable backend settings snapshot for the complete run', async () => {
     const queueManager = createQueueManager()
     queueManager.setKnownNamVersion(defaultSettings, '0.13.0')
@@ -437,7 +531,7 @@ describe('QueueManager A2 diagnostics gate', () => {
       hooks.onExit(0)
       return {
         cancel: vi.fn(),
-        forceKill: vi.fn(async () => undefined),
+        forceKill: vi.fn(async () => true),
         forceKillSync: vi.fn()
       }
     })

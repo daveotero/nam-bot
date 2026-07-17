@@ -15,6 +15,21 @@ describe('compareVersions', () => {
     expect(compareVersions('0.13.1', '0.13.0')).toBeGreaterThan(0)
     expect(compareVersions('0.12.3', '0.13.0')).toBeLessThan(0)
   })
+
+  it('treats NAM prereleases as older than the matching stable release', () => {
+    expect(compareVersions('0.13.0rc1', '0.13.0')).toBeLessThan(0)
+    expect(compareVersions('0.13.0-rc.2', '0.13.0')).toBeLessThan(0)
+    expect(compareVersions('0.13.0-beta3', '0.13.0')).toBeLessThan(0)
+  })
+
+  it('orders compact NAM prerelease revisions numerically', () => {
+    expect(compareVersions('0.13.0rc10', '0.13.0rc2')).toBeGreaterThan(0)
+    expect(compareVersions('v0.13.0a2', '0.13.0a10')).toBeLessThan(0)
+  })
+
+  it('ignores NAM build metadata', () => {
+    expect(compareVersions('0.13.0+cuda', '0.13.0')).toBe(0)
+  })
 })
 
 describe('parseNamLatencyAnalysisOutput', () => {

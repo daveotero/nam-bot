@@ -61,6 +61,8 @@ const workspacesPath = join(userDataPath, 'workspaces')
 const ACTIVE_JOB_STATUSES: JobStatus[] = ['preparing', 'running', 'stopping']
 const QUEUED_JOB_STATUSES: JobStatus[] = ['queued', 'validating']
 const FINISHED_JOB_STATUSES: JobStatus[] = ['succeeded', 'failed', 'canceled']
+const PROGRESS_BROADCAST_INTERVAL_MS = 250
+const PROGRESS_PERSIST_INTERVAL_MS = 1000
 const NUMERIC_TOKEN_PATTERN = '[+-]?\\d+(?:\\.\\d+)?(?:e[+-]?\\d+)?'
 const BEST_CHECKPOINT_PATTERN = new RegExp(
   `^(\\d{4})_(\\d+)_(${NUMERIC_TOKEN_PATTERN})_(${NUMERIC_TOKEN_PATTERN})\\.ckpt$`,
@@ -163,8 +165,7 @@ function buildBackendSettingsKey(settings: AppSettings): string {
     condaExecutablePath: settings.condaExecutablePath,
     backendMode: settings.backendMode,
     environmentName: settings.environmentName,
-    environmentPrefixPath: settings.environmentPrefixPath,
-    pythonExecutablePath: settings.pythonExecutablePath
+    environmentPrefixPath: settings.environmentPrefixPath
   })
 }
 
@@ -964,6 +965,8 @@ export class QueueManager extends EventEmitter {
   private activePreparationAbortController: AbortController | null = null
   private artifactBaselines: Map<string, Map<string, string>> = new Map()
   private outputPollTimer: NodeJS.Timeout | null = null
+  private progressBroadcastTimers: Map<string, NodeJS.Timeout> = new Map()
+  private progressPersistenceTimer: NodeJS.Timeout | null = null
   private knownNamVersion: KnownNamVersion | null = null
 
   private appendTerminalAnnotation(runtime: JobRuntimeState, message: string): void {
@@ -1474,12 +1477,60 @@ export class QueueManager extends EventEmitter {
     return true
   }
 
+  private clearScheduledProgressUpdate(jobId: string): void {
+    const timer = this.progressBroadcastTimers.get(jobId)
+    if (timer) {
+      clearTimeout(timer)
+      this.progressBroadcastTimers.delete(jobId)
+    }
+  }
+
+  private clearAllScheduledProgressUpdates(): void {
+    for (const timer of this.progressBroadcastTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.progressBroadcastTimers.clear()
+    if (this.progressPersistenceTimer) {
+      clearTimeout(this.progressPersistenceTimer)
+      this.progressPersistenceTimer = null
+    }
+  }
+
+  private scheduleProgressUpdate(runtime: JobRuntimeState): void {
+    if (!this.progressBroadcastTimers.has(runtime.jobId)) {
+      const broadcastTimer = setTimeout(() => {
+        this.progressBroadcastTimers.delete(runtime.jobId)
+        if (this.queue.includes(runtime)) {
+          this.emit('jobUpdated', runtime)
+        }
+      }, PROGRESS_BROADCAST_INTERVAL_MS)
+      this.progressBroadcastTimers.set(runtime.jobId, broadcastTimer)
+    }
+
+    if (!this.progressPersistenceTimer) {
+      this.progressPersistenceTimer = setTimeout(() => {
+        this.progressPersistenceTimer = null
+        try {
+          this.saveQueue()
+        } catch (error) {
+          log.error('Failed to persist throttled training progress:', error)
+        }
+      }, PROGRESS_PERSIST_INTERVAL_MS)
+    }
+  }
+
   private emitQueueUpdate(): void {
+    this.clearAllScheduledProgressUpdates()
     this.saveQueue()
     this.emit('queueUpdated', this.getQueue())
   }
 
   private emitJobUpdate(runtime: JobRuntimeState): void {
+    this.clearScheduledProgressUpdate(runtime.jobId)
+    if (this.progressPersistenceTimer) {
+      clearTimeout(this.progressPersistenceTimer)
+      this.progressPersistenceTimer = null
+    }
     this.saveQueue()
     this.emit('jobUpdated', runtime)
   }
@@ -1889,7 +1940,7 @@ export class QueueManager extends EventEmitter {
               changed = this.updateLatestLogLine(runtime, line) || changed
             }
             if (changed) {
-              this.emitJobUpdate(runtime)
+              this.scheduleProgressUpdate(runtime)
             }
           },
           onStarted: (pid) => {
@@ -2098,6 +2149,7 @@ export class QueueManager extends EventEmitter {
         this.activePreparationAbortController = null
       }
       this.artifactBaselines.delete(runtime.jobId)
+      this.clearScheduledProgressUpdate(runtime.jobId)
       this.stopOutputPolling()
       this.syncPublishedTerminalLog(runtime)
     }
@@ -2140,11 +2192,35 @@ export class QueueManager extends EventEmitter {
     this.currentJob.stopMode = 'force'
     this.appendUserMessage(this.currentJob, 'Force stop requested. NAM-BOT is killing the full training process tree.')
     this.emitJobUpdate(this.currentJob)
+    let terminationConfirmed = true
     if (this.activeController) {
-      await this.activeController.forceKill()
+      try {
+        terminationConfirmed = await this.activeController.forceKill()
+      } catch (error) {
+        terminationConfirmed = false
+        log.error(`Force stop failed for job ${jobId}:`, error)
+      }
     } else {
       this.activePreparationAbortController?.abort()
     }
+
+    if (!this.currentJob || this.currentJob.jobId !== jobId || this.currentJob.status !== 'stopping') {
+      return
+    }
+
+    this.currentJob.status = terminationConfirmed ? 'canceled' : 'failed'
+    this.currentJob.finishedAt = new Date().toISOString()
+    this.currentJob.pid = null
+    this.currentJob.errorCategory = terminationConfirmed ? 'force_stopped' : 'force_stop_failed'
+    this.appendUserMessage(
+      this.currentJob,
+      terminationConfirmed
+        ? 'The training process tree was force-stopped.'
+        : 'NAM-BOT could not confirm that the training process tree was terminated. Check Task Manager before starting another training job.'
+    )
+    this.activeController = null
+    this.stopOutputPolling()
+    this.emitJobUpdate(this.currentJob)
   }
 
   retryJob(jobId: string): JobRuntimeState | null {
@@ -2235,6 +2311,7 @@ export class QueueManager extends EventEmitter {
     }
     this.activeController = null
     this.activePreparationAbortController = null
+    this.clearAllScheduledProgressUpdates()
     this.saveQueue()
   }
 }

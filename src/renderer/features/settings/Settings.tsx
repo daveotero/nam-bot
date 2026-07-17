@@ -241,7 +241,6 @@ export default function Settings() {
           >
             <option value="conda-name">Conda Environment Name</option>
             <option value="conda-prefix">Conda Environment Prefix</option>
-            <option value="direct-python">Direct Python Path</option>
           </select>
         </div>
 
@@ -271,21 +270,6 @@ export default function Settings() {
                 setLocalSettings({ ...localSettings, environmentPrefixPath: e.target.value || null })
               }}
               placeholder="C:\Users\...\miniconda3\envs\nam"
-            />
-          </div>
-        )}
-
-        {localSettings.backendMode === 'direct-python' && (
-          <div className="form-group">
-            <label className="form-label">Python Executable Path</label>
-            <input
-              type="text"
-              className="form-input"
-              value={localSettings.pythonExecutablePath || ''}
-              onChange={(e) => {
-                setLocalSettings({ ...localSettings, pythonExecutablePath: e.target.value || null })
-              }}
-              placeholder={window.namBot.platform === 'win32' ? 'C:\\Users\\...\\python.exe' : '/usr/bin/python3'}
             />
           </div>
         )}
@@ -402,34 +386,6 @@ export default function Settings() {
           </label>
         </div>
 
-        <div className="form-group">
-          <label className="checkbox-container">
-            <input
-              type="checkbox"
-              checked={localSettings.persistQueueOnExit}
-              onChange={(e) => {
-                setLocalSettings({ ...localSettings, persistQueueOnExit: e.target.checked })
-              }}
-            />
-            <span className="checkmark"></span>
-            <span className="label-text">Persist queue on exit</span>
-          </label>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Log Retention (days)</label>
-          <input
-            type="number"
-            className="form-input"
-            value={localSettings.logRetentionDays}
-            onChange={(e) => {
-              setLocalSettings({ ...localSettings, logRetentionDays: parseInt(e.target.value) || 30 })
-            }}
-            min={1}
-            max={365}
-            style={{ width: '100px' }}
-          />
-        </div>
       </div>
     </div>
   )

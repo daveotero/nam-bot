@@ -212,7 +212,7 @@ The queue UI follows the same bottom-first execution model as drafts. The lowest
 Active jobs appear in the training section.
 
 - active jobs surface stop and force-stop controls
-- terminal logs can be expanded and refreshed while a job is active
+- terminal logs can be expanded and refresh incrementally while a job is active; the renderer keeps a bounded tail instead of repeatedly loading the entire file
 - while a run is active, elapsed time is measured from the start of the training run; remaining-time estimates are intentionally not shown because they proved unreliable across NAM training runs
 - expanded active-job details use a compact three-column layout: preset/training facts, ESR comparison, and artifact links
 
@@ -345,6 +345,8 @@ Stop requests use two modes:
 
 Stop and application-quit requests cover the complete run lifecycle. During `preparing`, NAM-BOT cancels latency, Lightning, Torch, and other environment subprocesses; after the training PTY starts, the same request controls the full training process tree.
 
+Force Stop always moves the job to a terminal state after the operating-system kill attempt. A confirmed process-tree termination becomes `canceled`; if termination cannot be confirmed, the job becomes `failed` with a message directing the user to check Task Manager instead of remaining stuck in `stopping`.
+
 Each run also captures one immutable backend-settings snapshot before preparation. Settings changes made while a job is preparing or running apply to later jobs, not the active run.
 
 ## What The Editor Fields Drive
@@ -451,6 +453,8 @@ Queue runtime state is persisted separately:
 - Windows: `%APPDATA%\\NAM-BOT\\queue.json`
 
 This is handled by the queue manager and represents queued, active, and historical runtime items rather than editable drafts.
+
+High-volume terminal progress is coalesced before queue state is written or sent to the renderer. Job progress events are emitted at most four times per second and queue persistence is limited to once per second, while terminal states and explicit queue operations are still persisted immediately.
 
 ### Editor Session Persistence
 

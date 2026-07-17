@@ -24,6 +24,7 @@ import {
   type JobOutputRootMode
 } from '../../state/store'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { useTerminalLogs } from '../../hooks/useTerminalLogs'
 import {
   DEFAULT_PRESET_ID,
   JobSpec,
@@ -356,7 +357,6 @@ export default function Jobs() {
   const queue = useAppStore((state) => state.queue)
   const setQueue = useAppStore((state) => state.setQueue)
   const loadJobs = useAppStore((state) => state.loadJobs)
-  const subscribeToJobEvents = useAppStore((state) => state.subscribeToJobEvents)
 
   useEffect(() => {
     const active = queue.some(r => r.status === 'preparing' || r.status === 'running' || r.status === 'stopping')
@@ -366,8 +366,7 @@ export default function Jobs() {
   const [queueError, setQueueError] = useState<string | null>(null)
   const [expandedJobs, setExpandedJobs] = useState<Record<string, boolean>>({})
   const [openLogs, setOpenLogs] = useState<Record<string, boolean>>({})
-  const [logContents, setLogContents] = useState<Record<string, string>>({})
-  const [loadingLogJobId, setLoadingLogJobId] = useState<string | null>(null)
+  const { logContents, loadingLogIds, loadTerminalLog, clearTerminalLog } = useTerminalLogs()
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [pendingDeleteJob, setPendingDeleteJob] = useState<JobSpec | null>(null)
   const [skipDraftDeleteConfirm, setSkipDraftDeleteConfirm] = useState(false)
@@ -460,15 +459,12 @@ export default function Jobs() {
   useEffect(() => {
     void loadPresets()
     void loadData()
+  }, [loadPresets, loadJobs])
 
-    const unsub = subscribeToJobEvents()
-    return unsub
-  }, [loadPresets, loadJobs, subscribeToJobEvents])
-
+  const hasActiveRuntimeClock = queue.some(
+    (runtime) => runtime.status === 'preparing' || runtime.status === 'running' || runtime.status === 'stopping'
+  )
   useEffect(() => {
-    const hasActiveRuntimeClock = queue.some(
-      (runtime) => runtime.status === 'preparing' || runtime.status === 'running' || runtime.status === 'stopping'
-    )
     if (!hasActiveRuntimeClock) {
       return
     }
@@ -478,24 +474,7 @@ export default function Jobs() {
     }, 1000)
 
     return () => window.clearInterval(interval)
-  }, [queue])
-
-  const loadTerminalLog = async (jobId: string, backgroundRefresh: boolean = false) => {
-    if (!backgroundRefresh) {
-      setLoadingLogJobId(jobId)
-    }
-    try {
-      const content = await window.namBot.logs.getTerminal(jobId)
-      setLogContents((current) => ({
-        ...current,
-        [jobId]: String(content || '')
-      }))
-    } finally {
-      if (!backgroundRefresh) {
-        setLoadingLogJobId((current) => (current === jobId ? null : current))
-      }
-    }
-  }
+  }, [hasActiveRuntimeClock])
 
   const queueRef = useRef(queue)
   queueRef.current = queue
@@ -513,12 +492,12 @@ export default function Jobs() {
         .map((runtime: JobRuntimeState) => runtime.jobId)
 
       activeVisibleLogIds.forEach((jobId: string) => {
-        void loadTerminalLog(jobId, true)
+        void loadTerminalLog(jobId)
       })
     }, 1500)
 
     return () => window.clearInterval(interval)
-  }, [openLogs])
+  }, [loadTerminalLog, openLogs])
 
   const handleCreateJob = () => {
     setJobEditorSession(buildJobEditorSession('New Job', createNewJobDraft({ presets, settings }), settings))
@@ -853,11 +832,7 @@ export default function Jobs() {
       delete next[jobId]
       return next
     })
-    setLogContents((current) => {
-      const next = { ...current }
-      delete next[jobId]
-      return next
-    })
+    clearTerminalLog(jobId)
     await loadData()
   }
 
@@ -1085,7 +1060,7 @@ export default function Jobs() {
                       isExpanded={expandedJobs[runtime.jobId] === true}
                       isLogsVisible={openLogs[runtime.jobId] === true}
                       terminalLog={logContents[runtime.jobId] || ''}
-                      isLoadingLog={loadingLogJobId === runtime.jobId}
+                      isLoadingLog={loadingLogIds.has(runtime.jobId)}
                       onToggleExpanded={toggleExpanded}
                       onToggleLogs={(entry) => toggleLogs(entry.jobId)}
                       onCancel={handleCancel}
@@ -1121,7 +1096,7 @@ export default function Jobs() {
                       isExpanded={expandedJobs[runtime.jobId] === true}
                       isLogsVisible={openLogs[runtime.jobId] === true}
                       terminalLog={logContents[runtime.jobId] || ''}
-                      isLoadingLog={loadingLogJobId === runtime.jobId}
+                      isLoadingLog={loadingLogIds.has(runtime.jobId)}
                       onToggleExpanded={toggleExpanded}
                       onToggleLogs={(entry) => toggleLogs(entry.jobId)}
                       onCancel={handleCancel}

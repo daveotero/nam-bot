@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-07-17
+
+### Changed
+
+- Updated vulnerable npm dependencies and refreshed the lockfile so the full dependency audit is clean.
+- Terminal logs now load incrementally with bounded renderer history, while high-volume training progress updates and queue persistence are coalesced to reduce UI lag.
+- Removed unsupported Direct Python configuration and unused queue-retention, log-retention, and launch-mode settings; older settings files migrate to supported Conda defaults.
+- Stable releases now require matching tag, package, and changelog versions, and preview packages receive unique Semantic Versions and artifact names.
+
+### Fixed
+
+- Force Stop now always moves a job to a terminal state, including a clear failure state when process-tree termination cannot be confirmed.
+- NAM prerelease versions now compare correctly for A2 compatibility checks instead of being treated as the matching stable release.
+
 ## [0.6.3] - 2026-07-13
 
 ### Added

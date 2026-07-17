@@ -67,20 +67,16 @@ export function shouldAutoLoadResource(
   return value == null && !loading && error == null
 }
 
-export type BackendMode = 'conda-name' | 'conda-prefix' | 'direct-python'
+export type BackendMode = 'conda-name' | 'conda-prefix'
 
 export interface AppSettings {
   condaExecutablePath: string | null
   backendMode: BackendMode
   environmentName: string | null
   environmentPrefixPath: string | null
-  pythonExecutablePath: string | null
   defaultOutputRoot: string | null
   defaultWorkspaceRoot: string | null
-  preferredLaunchMode: 'nam-full' | 'python-wrapper'
   autoOpenResultsFolder: boolean
-  persistQueueOnExit: boolean
-  logRetentionDays: number
   defaultAuthorName: string
   defaultAuthorUrl: string
 }
@@ -175,7 +171,6 @@ export type TrainingLaunchDiagnosticsIssue =
   | 'conda_not_configured'
   | 'conda_unreachable'
   | 'environment_not_configured'
-  | 'direct_python_unsupported'
   | 'lightning_security_check_failed'
   | 'lightning_vulnerable'
   | 'workspace_unwritable'
